@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { claudeJSON } from "@/lib/claude";
+import { callOllamaJSON } from "@/lib/ollama";
 import { buildAnalyzePrompt } from "@/lib/prompts";
 import type { AnalyzeRequestPayload, AnalyzeResponse } from "@/types/career";
 import type { ApiResponse } from "@/types/user";
 
-const MAX_RESUME_LENGTH = 10_000; // characters
+const MAX_RESUME_LENGTH = 10_000;
 
 export async function POST(req: NextRequest) {
     try {
@@ -33,16 +33,14 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // ── Build prompt & call Claude ───────────────────────────
+        // ── Build prompt & call Ollama ───────────────────────────
         const prompt = buildAnalyzePrompt({
             resume_text: body.resume_text.trim(),
             target_career: body.target_career.trim(),
             domain: body.domain,
         });
 
-        const result = await claudeJSON<AnalyzeResponse>(prompt, {
-            maxTokens: 3000,
-        });
+        const result = await callOllamaJSON<AnalyzeResponse>(prompt);
 
         return NextResponse.json<ApiResponse<AnalyzeResponse>>({
             success: true,

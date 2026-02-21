@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { claudeChat } from "@/lib/claude";
+import { callOllamaChat } from "@/lib/ollama";
 import { buildChatSystemPrompt } from "@/lib/prompts";
 import { getServerSupabase, TABLES } from "@/lib/supabase";
 import type { ChatRequestPayload, ChatResponse } from "@/types/chat";
 import type { ApiResponse } from "@/types/user";
 
-const MAX_HISTORY_MESSAGES = 20; // cap to control token usage
+const MAX_HISTORY_MESSAGES = 20;
 
 export async function POST(req: NextRequest) {
     try {
@@ -19,20 +19,21 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // Trim history to avoid context bloat
-        const history = (body.conversation_history ?? []).slice(
-            -MAX_HISTORY_MESSAGES
-        );
+        // Trim history to avoid prompt bloat
+        const history = (body.conversation_history ?? [])
+            .filter((m) => m.role !== "system")
+            .slice(-MAX_HISTORY_MESSAGES)
+            .map((m) => ({
+                role: m.role as "user" | "assistant",
+                content: m.content,
+            }));
 
-        // ── Build system prompt ──────────────────────────────────
+        // ── Build system prompt & call Ollama ────────────────────
         const systemPrompt = buildChatSystemPrompt(body.career_context);
-
-        // ── Call Claude ──────────────────────────────────────────
-        const { reply, usage } = await claudeChat(
-            history,
-            body.new_message.trim(),
+        const reply = await callOllamaChat(
             systemPrompt,
-            { maxTokens: 1024 }
+            history,
+            body.new_message.trim()
         );
 
         // ── Optionally persist session ────────────────────────────
@@ -41,7 +42,6 @@ export async function POST(req: NextRequest) {
             const supabase = getServerSupabase();
 
             if (!sessionId) {
-                // Create a new session
                 const { data: session } = await supabase
                     .from(TABLES.CHAT_SESSIONS)
                     .insert({
@@ -59,7 +59,6 @@ export async function POST(req: NextRequest) {
 
                 sessionId = session?.id;
             } else {
-                // Append to existing session
                 const { data: existing } = await supabase
                     .from(TABLES.CHAT_SESSIONS)
                     .select("messages")
@@ -74,14 +73,17 @@ export async function POST(req: NextRequest) {
 
                 await supabase
                     .from(TABLES.CHAT_SESSIONS)
-                    .update({ messages: updatedMessages, updated_at: new Date().toISOString() })
+                    .update({
+                        messages: updatedMessages,
+                        updated_at: new Date().toISOString(),
+                    })
                     .eq("id", sessionId);
             }
         }
 
         return NextResponse.json<ApiResponse<ChatResponse>>({
             success: true,
-            data: { reply, session_id: sessionId, usage },
+            data: { reply, session_id: sessionId },
         });
     } catch (error) {
         console.error("[/api/chat] Error:", error);

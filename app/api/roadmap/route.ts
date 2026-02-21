@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { claudeJSON } from "@/lib/claude";
+import { callOllamaJSON } from "@/lib/ollama";
 import { buildRoadmapPrompt } from "@/lib/prompts";
 import { getServerSupabase, TABLES } from "@/lib/supabase";
 import type { RoadmapRequestPayload, RoadmapResponse, Roadmap } from "@/types/roadmap";
@@ -41,14 +41,14 @@ export async function POST(req: NextRequest) {
             });
         }
 
-        // ── Generate with Claude ─────────────────────────────────
+        // ── Generate with Ollama ─────────────────────────────────
         const prompt = buildRoadmapPrompt({
             career: body.career,
             domain: body.domain,
             current_level: body.current_level ?? "beginner",
         });
 
-        const generated = await claudeJSON<Omit<Roadmap, "id" | "created_at">>(prompt);
+        const generated = await callOllamaJSON<Omit<Roadmap, "id" | "created_at">>(prompt);
 
         // ── Persist to Supabase ──────────────────────────────────
         const { data: saved, error: saveError } = await supabase

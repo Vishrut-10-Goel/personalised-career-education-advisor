@@ -8,6 +8,8 @@ import CareerDomainCard from '@/components/CareerDomainCard';
 export default function OnboardingPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState({
+    fullName: '',
+    email: '',
     careerDomain: '',
     education: '',
     skills: [] as string[],
