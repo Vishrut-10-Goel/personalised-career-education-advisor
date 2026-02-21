@@ -1,21 +1,46 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ChevronRight, ChevronLeft, Check, Code2, Stethoscope, Palette, Briefcase, Building2, Microscope, Lightbulb, Scale, Pencil, Wrench } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Check, Code2, Stethoscope, Palette, Briefcase, Building2, Microscope, Lightbulb, Scale, Pencil, Wrench, Loader2 } from 'lucide-react';
 import CareerDomainCard from '@/components/CareerDomainCard';
 
 export default function OnboardingPage() {
+  const router = useRouter();
   const [currentStep, setCurrentStep] = useState(1);
+  const [isLoading, setIsLoading] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
+
   const [formData, setFormData] = useState({
-    fullName: '',
-    email: '',
     careerDomain: '',
     education: '',
     skills: [] as string[],
     interests: [] as string[],
     experience: '',
   });
+
+  useEffect(() => {
+    const checkSession = async () => {
+      // Check localstorage for the flow we just came from (non-auth bypass)
+      const storedUser = localStorage.getItem('activeUser');
+      if (storedUser) {
+        try {
+          const parsed = JSON.parse(storedUser);
+          if (parsed.id) {
+            setUserId(parsed.id);
+            return;
+          }
+        } catch (e) {
+          console.error("Failed to parse stored user", e);
+        }
+      }
+
+      // If no stored user, redirect to signup
+      router.push('/signup');
+    };
+    checkSession();
+  }, [router]);
 
   const careerDomains = [
     { name: 'Technology & IT', icon: Code2 },
@@ -53,11 +78,42 @@ export default function OnboardingPage() {
     }));
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (currentStep < 5) {
       setCurrentStep(currentStep + 1);
     } else {
-      window.location.href = '/dashboard';
+      setIsLoading(true);
+      try {
+        if (!userId) {
+          router.push('/signup');
+          return;
+        }
+
+        const res = await fetch(`/api/user?id=${userId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            domain: formData.careerDomain,
+            education_level: formData.education,
+            skills: formData.skills,
+            interests: formData.interests,
+            target_career: null,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          alert(data.error || 'Failed to update profile. Please try again.');
+        } else {
+          if (data.data) {
+            localStorage.setItem("activeUser", JSON.stringify(data.data));
+          }
+          router.push("/recommendations");
+        }
+      } catch (error: any) {
+        alert('Network error: ' + error.message);
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -68,6 +124,7 @@ export default function OnboardingPage() {
   };
 
   const isStepComplete = () => {
+    if (!userId && !isLoading) return false;
     switch (currentStep) {
       case 1:
         return formData.careerDomain !== '';
@@ -85,37 +142,36 @@ export default function OnboardingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <div className="w-full max-w-2xl fade-in">
+    <div className="min-h-screen bg-background flex items-center justify-center py-16 px-6">
+      <div className="w-full max-w-5xl mx-auto space-y-12 fade-in">
         {/* Header */}
-        <div className="text-center mb-12">
+        <div className="text-center">
           <Link href="/" className="inline-flex items-center justify-center gap-2 mb-8">
             <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-blue-500 rounded-lg flex items-center justify-center">
               <span className="text-white font-bold text-lg">A</span>
             </div>
             <span className="gradient-text font-bold text-xl">CareerAI</span>
           </Link>
-          <h1 className="text-4xl font-bold text-white mb-2">Let's Get Started</h1>
-          <p className="text-gray-400">Tell us about yourself so we can personalize your experience</p>
+          <h1 className="text-3xl font-bold text-white mb-2">Let's Get Started</h1>
+          <p className="text-sm text-gray-400 mb-10 mx-auto max-w-md">Tell us about yourself so we can personalize your experience</p>
         </div>
 
-        {/* Progress Bar */}
-        <div className="mb-8">
-          <div className="flex justify-between mb-4">
+        {/* Progress Bar (Stepper) */}
+        <div className="mb-12">
+          <div className="flex justify-center gap-6 mb-8">
             {[1, 2, 3, 4, 5].map((step) => (
               <div
                 key={step}
-                className={`flex items-center justify-center w-10 h-10 rounded-full ${
-                  step <= currentStep
-                    ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white'
-                    : 'glass-card text-gray-400'
-                }`}
+                className={`flex items-center justify-center w-10 h-10 rounded-full font-bold transition-all duration-300 ${step <= currentStep
+                  ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white'
+                  : 'bg-gray-800/40 text-gray-500'
+                  }`}
               >
                 {step < currentStep ? <Check size={20} /> : step}
               </div>
             ))}
           </div>
-          <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden">
+          <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden max-w-md mx-auto">
             <div
               className="h-full bg-gradient-to-r from-purple-500 to-blue-500 transition-all duration-300"
               style={{ width: `${(currentStep / 5) * 100}%` }}
@@ -123,24 +179,26 @@ export default function OnboardingPage() {
           </div>
         </div>
 
-        {/* Form Card */}
-        <div className="glass-card p-8 rounded-2xl min-h-80">
-          {/* Step 1: Career Domain */}
+        {/* Form Section */}
+        <div className="space-y-8 relative">
+          {/* Step 1: Career Domain Selection */}
           {currentStep === 1 && (
-            <div className="space-y-6 fade-in">
-              <div>
-                <h2 className="text-2xl font-semibold text-white mb-2">Select your career domain</h2>
-                <p className="text-gray-400">Choose the field that interests you most</p>
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+            <div className="space-y-8 fade-in flex flex-col items-center">
+              <h2 className="text-xl font-semibold text-white">Which domain excites you?</h2>
+
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 w-full">
                 {careerDomains.map((domain) => (
-                  <CareerDomainCard
+                  <button
                     key={domain.name}
-                    title={domain.name}
-                    icon={domain.icon}
-                    isSelected={formData.careerDomain === domain.name}
                     onClick={() => setFormData({ ...formData, careerDomain: domain.name })}
-                  />
+                    className={`rounded-xl p-6 text-center flex flex-col items-center justify-center min-h-[140px] transition-all transform hover:scale-105 hover:shadow-lg border-2 ${formData.careerDomain === domain.name
+                      ? "border-purple-500 bg-purple-900/30 text-white"
+                      : "bg-gray-800/40 border-transparent text-gray-400 hover:bg-gray-800/70"
+                      }`}
+                  >
+                    <domain.icon className={`mb-4 ${formData.careerDomain === domain.name ? 'text-purple-400' : 'text-gray-500'}`} size={32} />
+                    <span className="text-sm leading-relaxed whitespace-normal font-medium">{domain.name}</span>
+                  </button>
                 ))}
               </div>
             </div>
@@ -148,23 +206,22 @@ export default function OnboardingPage() {
 
           {/* Step 2: Education */}
           {currentStep === 2 && (
-            <div className="space-y-6 fade-in">
-              <div>
-                <h2 className="text-2xl font-semibold text-white mb-2">What's your education level?</h2>
-                <p className="text-gray-400">This helps us customize your learning path</p>
-              </div>
-              <div className="space-y-3">
+            <div className="max-w-2xl mx-auto space-y-6 fade-in">
+              <h2 className="text-xl font-semibold text-white text-center">Academic Foundation</h2>
+              <div className="grid gap-4">
                 {educationOptions.map((option) => (
                   <button
                     key={option}
                     onClick={() => setFormData({ ...formData, education: option })}
-                    className={`w-full p-4 rounded-lg text-left transition-all ${
-                      formData.education === option
-                        ? 'glass-card-dark border-l-4 border-purple-500 bg-purple-500/10'
-                        : 'glass-card-dark hover:border-l-4 hover:border-purple-500/50'
-                    }`}
+                    className={`w-full p-6 rounded-xl text-left transition-all border-2 ${formData.education === option
+                      ? 'border-purple-500 bg-purple-900/30 text-white'
+                      : 'bg-gray-800/40 border-transparent text-gray-400 hover:bg-gray-800/70'
+                      }`}
                   >
-                    <span className="font-medium">{option}</span>
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold">{option}</span>
+                      {formData.education === option && <Check className="text-purple-400" size={20} />}
+                    </div>
                   </button>
                 ))}
               </div>
@@ -173,23 +230,20 @@ export default function OnboardingPage() {
 
           {/* Step 3: Skills */}
           {currentStep === 3 && (
-            <div className="space-y-6 fade-in">
-              <div>
-                <h2 className="text-2xl font-semibold text-white mb-2">What skills do you have?</h2>
-                <p className="text-gray-400">Select all that apply</p>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
+            <div className="max-w-2xl mx-auto space-y-6 fade-in">
+              <h2 className="text-xl font-semibold text-white text-center">Your Arsenal</h2>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                 {skillOptions.map((skill) => (
                   <button
                     key={skill}
                     onClick={() => handleSkillToggle(skill)}
-                    className={`p-3 rounded-lg transition-all ${
-                      formData.skills.includes(skill)
-                        ? 'glass-card-dark bg-purple-500/20 border-l-2 border-purple-500 text-purple-300'
-                        : 'glass-card-dark hover:border-l-2 hover:border-purple-500/50'
-                    }`}
+                    className={`p-4 rounded-xl transition-all border-2 flex items-center justify-between ${formData.skills.includes(skill)
+                      ? 'border-purple-500 bg-purple-900/30 text-white'
+                      : 'bg-gray-800/40 border-transparent text-gray-400 hover:bg-gray-800/70'
+                      }`}
                   >
                     <span className="text-sm font-medium">{skill}</span>
+                    {formData.skills.includes(skill) && <Check size={16} className="text-purple-400" />}
                   </button>
                 ))}
               </div>
@@ -198,23 +252,20 @@ export default function OnboardingPage() {
 
           {/* Step 4: Interests */}
           {currentStep === 4 && (
-            <div className="space-y-6 fade-in">
-              <div>
-                <h2 className="text-2xl font-semibold text-white mb-2">What are your career interests?</h2>
-                <p className="text-gray-400">Choose areas that interest you</p>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
+            <div className="max-w-2xl mx-auto space-y-6 fade-in">
+              <h2 className="text-xl font-semibold text-white text-center">Core Passion</h2>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                 {interestOptions.map((interest) => (
                   <button
                     key={interest}
                     onClick={() => handleInterestToggle(interest)}
-                    className={`p-3 rounded-lg transition-all ${
-                      formData.interests.includes(interest)
-                        ? 'glass-card-dark bg-blue-500/20 border-l-2 border-blue-500 text-blue-300'
-                        : 'glass-card-dark hover:border-l-2 hover:border-blue-500/50'
-                    }`}
+                    className={`p-4 rounded-xl transition-all border-2 flex items-center justify-between ${formData.interests.includes(interest)
+                      ? 'border-blue-500 bg-blue-900/30 text-white'
+                      : 'bg-gray-800/40 border-transparent text-gray-400 hover:bg-gray-800/70'
+                      }`}
                   >
                     <span className="text-sm font-medium">{interest}</span>
+                    {formData.interests.includes(interest) && <Check size={16} className="text-blue-400" />}
                   </button>
                 ))}
               </div>
@@ -223,23 +274,19 @@ export default function OnboardingPage() {
 
           {/* Step 5: Experience */}
           {currentStep === 5 && (
-            <div className="space-y-6 fade-in">
-              <div>
-                <h2 className="text-2xl font-semibold text-white mb-2">What's your experience level?</h2>
-                <p className="text-gray-400">We'll adjust the difficulty accordingly</p>
-              </div>
-              <div className="space-y-3">
+            <div className="max-w-md mx-auto space-y-6 fade-in text-center">
+              <h2 className="text-xl font-semibold text-white">Professional Maturity</h2>
+              <div className="grid gap-4">
                 {experienceOptions.map((option) => (
                   <button
                     key={option}
                     onClick={() => setFormData({ ...formData, experience: option })}
-                    className={`w-full p-4 rounded-lg text-left transition-all ${
-                      formData.experience === option
-                        ? 'glass-card-dark border-l-4 border-blue-500 bg-blue-500/10'
-                        : 'glass-card-dark hover:border-l-4 hover:border-blue-500/50'
-                    }`}
+                    className={`w-full p-5 rounded-xl text-center transition-all border-2 ${formData.experience === option
+                      ? 'border-blue-500 bg-blue-900/30 text-white shadow-lg'
+                      : 'bg-gray-800/40 border-transparent text-gray-400 hover:bg-gray-800/70'
+                      }`}
                   >
-                    <span className="font-medium">{option}</span>
+                    <span className="font-bold">{option}</span>
                   </button>
                 ))}
               </div>
@@ -247,30 +294,38 @@ export default function OnboardingPage() {
           )}
         </div>
 
-        {/* Navigation Buttons */}
-        <div className="flex gap-4 mt-8">
+        {/* Navigation Buttons Section */}
+        <div className="mt-12 flex justify-between items-center max-w-2xl mx-auto w-full">
           <button
             onClick={handleBack}
-            disabled={currentStep === 1}
-            className="flex items-center gap-2 px-6 py-3 rounded-lg glass-card text-white font-medium hover-lift disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            disabled={currentStep === 1 || isLoading}
+            className="flex items-center gap-2 px-6 py-3 rounded-lg bg-white/5 text-gray-400 font-bold hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
           >
             <ChevronLeft size={20} />
-            Back
+            BACK
           </button>
+
           <button
             onClick={handleNext}
-            disabled={!isStepComplete()}
-            className="flex-1 flex items-center justify-center gap-2 px-6 py-3 rounded-lg gradient-button text-white font-medium hover-lift disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            disabled={!isStepComplete() || isLoading}
+            className="flex items-center justify-center gap-2 px-8 py-3 rounded-lg gradient-button text-white font-bold hover-lift disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-xl shadow-purple-500/20"
           >
-            {currentStep === 5 ? 'Complete' : 'Next'}
-            <ChevronRight size={20} />
+            {isLoading ? (
+              <>
+                <Loader2 className="animate-spin" size={20} />
+                EVOLVING...
+              </>
+            ) : currentStep === 5 ? 'COMPLETE TRANSFORMATION' : 'CONTINUE'}
+            {!isLoading && <ChevronRight size={20} />}
           </button>
         </div>
 
-        {/* Step Info */}
-        <p className="text-center text-gray-500 text-sm mt-4">
-          Step {currentStep} of 5
-        </p>
+        {/* Step Info Pagination Dots */}
+        <div className="flex justify-center gap-3 mt-8">
+          {[1, 2, 3, 4, 5].map((s) => (
+            <div key={s} className={`h-1.5 w-8 rounded-full transition-all duration-300 ${s === currentStep ? 'bg-purple-500 w-12' : 'bg-gray-800'}`} />
+          ))}
+        </div>
       </div>
     </div>
   );

@@ -3,10 +3,10 @@ import { createClient, SupabaseClient } from "@supabase/supabase-js";
 // ─────────────────────────────────────────────
 // Environment validation
 // ─────────────────────────────────────────────
-const getEnv = (key: string): string => {
+const getServerEnv = (key: string): string => {
     const value = process.env[key];
     if (!value) {
-        throw new Error(`Missing required environment variable: ${key}`);
+        throw new Error(`Missing required server environment variable: ${key}`);
     }
     return value;
 };
@@ -20,8 +20,8 @@ let serverClient: SupabaseClient | null = null;
 export const getServerSupabase = (): SupabaseClient => {
     if (!serverClient) {
         serverClient = createClient(
-            getEnv("NEXT_PUBLIC_SUPABASE_URL"),
-            getEnv("SUPABASE_SERVICE_ROLE_KEY"),
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            getServerEnv("SUPABASE_SERVICE_ROLE_KEY"),
             {
                 auth: {
                     autoRefreshToken: false,
@@ -40,10 +40,17 @@ let anonClient: SupabaseClient | null = null;
 
 export const getAnonSupabase = (): SupabaseClient => {
     if (!anonClient) {
-        anonClient = createClient(
-            getEnv("NEXT_PUBLIC_SUPABASE_URL"),
-            getEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY")
-        );
+        const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+        if (!url || !key) {
+            throw new Error(
+                "Missing Supabase client environment variables. " +
+                "Ensure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set."
+            );
+        }
+
+        anonClient = createClient(url, key);
     }
     return anonClient;
 };

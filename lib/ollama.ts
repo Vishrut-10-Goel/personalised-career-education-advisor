@@ -6,7 +6,7 @@ import axios from "axios";
 const OLLAMA_BASE_URL =
     process.env.OLLAMA_BASE_URL ?? "http://localhost:11434";
 
-const OLLAMA_MODEL = process.env.OLLAMA_MODEL ?? "phi3";
+const OLLAMA_MODEL = process.env.OLLAMA_MODEL ?? "llama3:8b";
 
 // ─────────────────────────────────────────────
 // Core: single-turn text completion
@@ -22,8 +22,8 @@ export async function callOllama(prompt: string): Promise<string> {
             },
             {
                 headers: { "Content-Type": "application/json" },
-                // Give local model enough time to respond
-                timeout: 120_000,
+                // Give local model enough time to respond (up to 5 mins)
+                timeout: 300_000,
             }
         );
 
@@ -91,10 +91,14 @@ function extractJSON(raw: string): string {
 export async function callOllamaJSON<T>(prompt: string): Promise<T> {
     const raw = await callOllama(prompt);
 
-    const cleaned = extractJSON(raw);
-
-    // Safe to parse — extractJSON already validated it
-    return JSON.parse(cleaned) as T;
+    try {
+        const cleaned = extractJSON(raw);
+        return JSON.parse(cleaned) as T;
+    } catch (error) {
+        console.error("Ollama JSON Extraction Failed!");
+        console.error("Raw Response:", raw);
+        throw error;
+    }
 }
 
 

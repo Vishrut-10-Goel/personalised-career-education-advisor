@@ -30,11 +30,12 @@ export interface UserProfile {
   skills: string[];
   interests: string[];
   target_career: string | null;
+  password?: string; // Stored for manual bypass
   created_at: string;
   updated_at: string;
 }
-
 export interface CreateUserProfilePayload {
+  id: string;
   email: string;
   full_name?: string;
   domain?: Domain;
@@ -42,6 +43,7 @@ export interface CreateUserProfilePayload {
   skills?: string[];
   interests?: string[];
   target_career?: string;
+  password?: string;
 }
 
 export interface UpdateUserProfilePayload {

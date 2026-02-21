@@ -1,29 +1,16 @@
-export type Difficulty = "beginner" | "intermediate" | "advanced";
-
 export interface RoadmapTopic {
-    id: string;
+    id: string; // Deterministic stable ID
     title: string;
     description: string;
-    difficulty: Difficulty;
     estimated_hours: number;
-    resources: RoadmapResource[];
-    prerequisites: string[]; // topic IDs
-    is_optional: boolean;
-}
-
-export interface RoadmapResource {
-    title: string;
-    url?: string;
-    type: "article" | "video" | "course" | "book" | "project" | "docs";
-    free: boolean;
 }
 
 export interface RoadmapSection {
-    level: Difficulty;
+    id: string; // Deterministic stable ID
     title: string;
-    description: string;
-    topics: RoadmapTopic[];
+    stage: "Beginner" | "Intermediate" | "Advanced";
     estimated_weeks: number;
+    topics: RoadmapTopic[];
 }
 
 export interface Roadmap {
@@ -32,18 +19,14 @@ export interface Roadmap {
     domain: string;
     overview: string;
     total_estimated_weeks: number;
-    sections: {
-        beginner: RoadmapSection;
-        intermediate: RoadmapSection;
-        advanced: RoadmapSection;
-    };
+    sections: RoadmapSection[];
     created_at: string;
 }
 
 export interface RoadmapRequestPayload {
     career: string;
     domain: string;
-    current_level?: Difficulty;
+    current_level?: string;
     user_id?: string;
 }
 
@@ -57,7 +40,7 @@ export interface UserProgress {
     roadmap_id: string;
     career: string;
     completed_topic_ids: string[];
-    current_section: Difficulty;
+    current_section: string;
     overall_progress_percent: number;
     last_activity_at: string;
     created_at: string;
@@ -77,7 +60,7 @@ export interface ProgressSummary {
     total_topics: number;
     completed_topics: number;
     overall_progress_percent: number;
-    current_section: Difficulty;
+    current_section: string;
     estimated_weeks_remaining: number;
     last_activity_at: string;
 }

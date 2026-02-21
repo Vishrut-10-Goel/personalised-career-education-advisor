@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSupabase, TABLES } from "@/lib/supabase";
-import type { UpdateProgressPayload, UserProgress, ProgressSummary } from "@/types/roadmap";
+import type { Roadmap, UserProgress } from "@/types/roadmap";
 import type { ApiResponse } from "@/types/user";
 
-// ─────────────────────────────────────────────
-// GET /api/progress?user_id=<id>&roadmap_id=<id>
-// Returns progress summary for a specific roadmap
-// ─────────────────────────────────────────────
+/**
+ * GET: Fetch progress for a specific user and roadmap
+ */
 export async function GET(req: NextRequest) {
     try {
         const { searchParams } = new URL(req.url);
@@ -15,157 +14,188 @@ export async function GET(req: NextRequest) {
 
         if (!user_id) {
             return NextResponse.json<ApiResponse>(
-                { success: false, error: "Query parameter 'user_id' is required." },
+                { success: false, error: "user_id is required." },
                 { status: 400 }
             );
         }
 
         const supabase = getServerSupabase();
 
-        // Build query — optionally filter by roadmap
-        const query = supabase
+        // 1. If roadmap_id is provided, fetch specific progress
+        if (roadmap_id) {
+            const { data: progress, error } = await supabase
+                .from(TABLES.PROGRESS)
+                .select("*")
+                .eq("user_id", user_id)
+                .eq("roadmap_id", roadmap_id)
+                .maybeSingle();
+
+            if (error) throw error;
+
+            if (!progress) {
+                return NextResponse.json<ApiResponse<{ completed_topic_ids: string[]; overall_progress_percent: number }>>({
+                    success: true,
+                    data: {
+                        completed_topic_ids: [],
+                        overall_progress_percent: 0,
+                    },
+                });
+            }
+
+            return NextResponse.json<ApiResponse<UserProgress>>({
+                success: true,
+                data: progress as UserProgress,
+            });
+        }
+
+        // 2. Otherwise, fetch all progress rows for the user
+        const { data: allProgress, error: allProgressError } = await supabase
             .from(TABLES.PROGRESS)
             .select("*")
-            .eq("user_id", user_id)
-            .order("updated_at", { ascending: false });
+            .eq("user_id", user_id);
 
-        if (roadmap_id) {
-            query.eq("roadmap_id", roadmap_id);
-        }
+        if (allProgressError) throw allProgressError;
 
-        const { data, error } = await query;
-        if (error) throw error;
-
-        if (!data || data.length === 0) {
-            return NextResponse.json<ApiResponse>(
-                { success: false, error: "No progress records found." },
-                { status: 404 }
-            );
-        }
-
-        // Map to ProgressSummary shape
-        const summaries: ProgressSummary[] = (data as UserProgress[]).map((p) => ({
-            roadmap_id: p.roadmap_id,
-            career: p.career,
-            total_topics: p.completed_topic_ids.length, // approximation pre-roadmap fetch
-            completed_topics: p.completed_topic_ids.length,
-            overall_progress_percent: p.overall_progress_percent,
-            current_section: p.current_section,
-            estimated_weeks_remaining: Math.max(
-                0,
-                Math.ceil(((100 - p.overall_progress_percent) / 100) * 52)
-            ),
-            last_activity_at: p.last_activity_at,
-        }));
-
-        return NextResponse.json<ApiResponse<ProgressSummary[]>>({
+        return NextResponse.json<ApiResponse<UserProgress[]>>({
             success: true,
-            data: roadmap_id ? [summaries[0]] : summaries,
+            data: allProgress as UserProgress[],
         });
     } catch (error) {
-        console.error("[GET /api/progress] Error:", error);
+        console.error("[/api/progress] GET Error:", error);
         return NextResponse.json<ApiResponse>(
             {
                 success: false,
-                error:
-                    error instanceof Error ? error.message : "An unexpected error occurred.",
+                error: error instanceof Error ? error.message : "An unexpected error occurred.",
             },
             { status: 500 }
         );
     }
 }
 
-// ─────────────────────────────────────────────
-// POST /api/progress  — mark a topic as complete
-// ─────────────────────────────────────────────
+/**
+ * POST: Update progress (mark topic as complete)
+ */
 export async function POST(req: NextRequest) {
     try {
-        const body: UpdateProgressPayload = await req.json();
+        const body = await req.json();
+        const { user_id, roadmap_id, topic_id } = body;
 
-        if (!body.user_id || !body.roadmap_id || !body.completed_topic_id) {
+        if (!user_id || !roadmap_id || !topic_id) {
             return NextResponse.json<ApiResponse>(
-                {
-                    success: false,
-                    error: "user_id, roadmap_id, and completed_topic_id are required.",
-                },
+                { success: false, error: "user_id, roadmap_id, and topic_id are required." },
                 { status: 400 }
             );
         }
 
         const supabase = getServerSupabase();
 
-        // Fetch existing progress record
-        const { data: existing, error: fetchError } = await supabase
-            .from(TABLES.PROGRESS)
+        // 1. Fetch the roadmap to count total topics
+        const { data: roadmap, error: roadmapError } = await supabase
+            .from(TABLES.ROADMAPS)
             .select("*")
-            .eq("user_id", body.user_id)
-            .eq("roadmap_id", body.roadmap_id)
-            .maybeSingle();
+            .eq("id", roadmap_id)
+            .single();
 
-        if (fetchError) throw fetchError;
-
-        const now = new Date().toISOString();
-
-        if (!existing) {
-            // Create new progress record
-            const { data: created, error: createError } = await supabase
-                .from(TABLES.PROGRESS)
-                .insert({
-                    user_id: body.user_id,
-                    roadmap_id: body.roadmap_id,
-                    career: body.career,
-                    completed_topic_ids: [body.completed_topic_id],
-                    current_section: "beginner",
-                    overall_progress_percent: 0,
-                    last_activity_at: now,
-                })
-                .select()
-                .single();
-
-            if (createError) throw createError;
-
-            return NextResponse.json<ApiResponse<UserProgress>>(
-                { success: true, data: created as UserProgress, message: "Progress record created." },
-                { status: 201 }
+        if (roadmapError || !roadmap) {
+            return NextResponse.json<ApiResponse>(
+                { success: false, error: "Roadmap not found." },
+                { status: 404 }
             );
         }
 
-        // Deduplicate completed topics
-        const completedSet = new Set<string>(existing.completed_topic_ids ?? []);
-        completedSet.add(body.completed_topic_id);
-        const completed_topic_ids = Array.from(completedSet);
+        const typedRoadmap = roadmap as Roadmap;
+        let totalTopics = 0;
 
-        // Determine current section based on rough progress thresholds
-        const percent = existing.overall_progress_percent ?? 0;
-        const current_section =
-            percent >= 66 ? "advanced" : percent >= 33 ? "intermediate" : "beginner";
+        // Handle array-based sections
+        if (Array.isArray(typedRoadmap.sections)) {
+            typedRoadmap.sections.forEach((section) => {
+                totalTopics += (section.topics || []).length;
+            });
+        }
 
-        const { data: updated, error: updateError } = await supabase
+        if (totalTopics === 0) {
+            return NextResponse.json<ApiResponse>(
+                { success: false, error: "Roadmap has no topics." },
+                { status: 400 }
+            );
+        }
+
+        // 2. Fetch existing progress
+        const { data: existingProgress, error: progressError } = await supabase
             .from(TABLES.PROGRESS)
-            .update({
-                completed_topic_ids,
-                current_section,
-                last_activity_at: now,
-                updated_at: now,
-            })
-            .eq("id", existing.id)
-            .select()
-            .single();
+            .select("*")
+            .eq("user_id", user_id)
+            .eq("roadmap_id", roadmap_id)
+            .maybeSingle();
 
-        if (updateError) throw updateError;
+        if (progressError) throw progressError;
+
+        let completedIds: string[] = existingProgress?.completed_topic_ids || [];
+
+        // 3. Update completed list
+        if (!completedIds.includes(topic_id)) {
+            completedIds.push(topic_id);
+        } else {
+            // Already complete, return existing row
+            return NextResponse.json<ApiResponse<UserProgress>>({
+                success: true,
+                data: existingProgress as UserProgress,
+            });
+        }
+
+        const progressPercent = Math.floor((completedIds.length / totalTopics) * 100);
+
+        // Determine current section (simple logic: divide percent by 33 for 3 levels)
+        let current_section = "Beginner";
+        if (progressPercent >= 66) current_section = "Advanced";
+        else if (progressPercent >= 33) current_section = "Intermediate";
+
+        // 4. Upsert progress row
+        const now = new Date().toISOString();
+        const progressUpdate = {
+            user_id,
+            roadmap_id,
+            career: typedRoadmap.career,
+            completed_topic_ids: completedIds,
+            current_section: current_section,
+            overall_progress_percent: progressPercent,
+            last_activity_at: now,
+            updated_at: now,
+        };
+
+        let result;
+        if (existingProgress) {
+            const { data, error: updateError } = await supabase
+                .from(TABLES.PROGRESS)
+                .update(progressUpdate)
+                .eq("id", existingProgress.id)
+                .select()
+                .single();
+            if (updateError) throw updateError;
+            result = data;
+        } else {
+            const { data, error: insertError } = await supabase
+                .from(TABLES.PROGRESS)
+                .insert({
+                    ...progressUpdate,
+                    created_at: now,
+                })
+                .select()
+                .single();
+            if (insertError) throw insertError;
+            result = data;
+        }
 
         return NextResponse.json<ApiResponse<UserProgress>>({
             success: true,
-            data: updated as UserProgress,
-            message: "Progress updated.",
+            data: result as UserProgress,
         });
     } catch (error) {
-        console.error("[POST /api/progress] Error:", error);
+        console.error("[/api/progress] POST Error:", error);
         return NextResponse.json<ApiResponse>(
             {
                 success: false,
-                error:
-                    error instanceof Error ? error.message : "An unexpected error occurred.",
+                error: error instanceof Error ? error.message : "An unexpected error occurred.",
             },
             { status: 500 }
         );
