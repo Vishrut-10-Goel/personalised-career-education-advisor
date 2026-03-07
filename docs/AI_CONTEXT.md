@@ -1,52 +1,59 @@
 # AI Project Context
 
 ## Project Overview
-Personalized Career Education Advisor — An AI-driven platform that helps users discover career paths, generates detailed learning roadmaps, and tracks progress towards career goals.
+CareerVibe — Personalised Career Education Advisor — An AI-driven platform that helps users discover career paths, generates detailed learning roadmaps, and tracks progress towards career goals. All AI features are powered by the **Google Gemini API** (no local LLM required).
 
 ## Tech Stack
-- **Frontend**: Next.js 15 (App Router), Tailwind CSS, Lucide React (Icons).
+- **Frontend**: Next.js 15 (App Router), Tailwind CSS v4, Lucide React (Icons).
 - **Backend**: Next.js API Routes.
-- **Database**: Supabase (PostgreSQL).
-- **Auth**: Manual password storage in `user_profiles` (Transitioning to Supabase Auth).
-- **AI/ML**: 
-  - **Gemini (v1beta)**: Primary engine for Recommendations and Roadmaps.
-  - **Ollama**: Currently powering the Chatbot (Local execution).
-- **Infrastructure**: Local development (Next.js server), Supabase Cloud.
+- **Database**: Supabase (PostgreSQL + JSONB for roadmaps).
+- **Auth**: Manual password storage in `user_profiles` (lightweight, no Supabase Auth).
+- **AI/ML**:
+  - **Gemini (v1beta)**: Powers ALL features — Chatbot, Career Recommendations, and Roadmap Generation.
+  - **Ollama**: Removed / deprecated. No longer used.
+
+## AI Model Priority (Free Tier Optimized)
+The project uses a cost-efficient model fallback chain in `lib/gemini.ts`:
+1. `gemini-flash-lite-latest` — lightest, lowest token cost (primary)
+2. `gemini-1.5-flash-8b` — fast 8B model (secondary)
+3. `gemini-flash-latest` — latest flash alias (tertiary)
+4. `gemini-1.5-flash` — stable fallback
+
+> ⚠️ Pro models (Gemini Pro, 2.5 Pro) are intentionally excluded to preserve free-tier quotas.
 
 ## Architecture Summary
 The application follows a linear progression:
-1. **Onboarding**: User provides skills, interests, and domain.
-2. **Recommendations**: Gemini generates tailored career paths based on user profile.
-3. **Roadmap**: AI builds a specific learning journey for a chosen career.
-4. **Dashboard**: Central hub for tracking active learning, metrics, and quick access to tools.
+1. **Landing Page**: Unauthenticated visitors see "Sign In" / "Sign Up". CTA redirects to signup.
+2. **Signup/Login**: Lightweight auth — password stored directly in `user_profiles`.
+3. **Onboarding**: User provides skills, interests, and domain across 5 steps.
+4. **Recommendations**: Gemini generates tailored career paths based on user profile.
+5. **Roadmap**: AI builds a specific learning journey for a chosen career.
+6. **Dashboard**: Central hub for tracking active learning, metrics, and quick access to tools.
+7. **Chatbot**: Real-time AI career advice powered by Gemini.
 
 ## Core Features
 - **AI-Generated Recommendations**: Dynamically generated career paths with job outlook and salary data.
 - **AI-Driven Roadmaps**: Step-by-step learning modules with integrated YouTube/Course learning resources.
-- **Skill Gap Analyzer**: Deep analysis comparing user profile DNA against targeted career requirements with a readiness score.
-- **CareerVibe Chatbot**: Context-aware AI mentoring integrated with active roadmap data.
-- **Social Sharing**: One-click sharing of career progress and mastery metrics.
+- **CareerVibe Chatbot**: Context-aware AI mentoring powered entirely by Gemini (no Ollama).
+- **Landing Page Auth Gate**: Unauthenticated users are redirected to signup before accessing career tools.
 
 ## Current Status
-- Career recommendations and roadmap generation are fully functional with Gemini integration.
-- **Skill Gap Analyzer** is live, providing personalized readiness scores.
-- **Resource Ingestion** is active, providing real learning links for every topic.
-- Persistence is implemented: Roadmaps and progress are linked via Supabase.
-
-## Current Task
-- Finalizing UI unification and ensuring all AI prompts include mandated resource fields.
+- ✅ All AI features (Chatbot, Roadmap, Recommendations) are fully powered by Gemini
+- ✅ Fallback mechanism removed — errors are surfaced directly to the user
+- ✅ Model list optimized for free-tier API usage (lightweight models first)
+- ✅ Landing page properly gates unauthenticated users to signup/login
+- ✅ `crypto.randomUUID` fallback added for broad browser compatibility
 
 ## Constraints
-- **Styling**: Adhere to the "CareerVibe" aesthetic — dark mode (#080808 background), neon green (#c6ff00) accents, and bold/black typography (NO ITALICS).
-- **API Flow**: Use the fallback chain in `lib/gemini.ts`.
+- **Styling**: Adhere to the "CareerVibe" aesthetic — dark mode (`#080808` background), neon green (`#c6ff00`) accents, bold/black typography (NO ITALICS).
+- **API Flow**: All AI calls must use `generateGemini()` in `lib/gemini.ts`.
 - **Data Standards**: All names and career titles must be formatted using `toTitleCase`.
+- **Security**: `GEMINI_API_KEY` and Supabase keys must never appear in frontend code or be committed to Git.
 
-## Next Planned Features
-- Stripe/Payment integration for premium tiers.
-- Resume/Portfolio generator from mastered skills.
-- Migration of Chatbot from Ollama to Gemini.
-
-## Notes for AI Agents
-- Always read `docs/AI_CONTEXT.md` before editing.
-- Ensure `toTitleCase` utility is used for all user-facing names and titles.
-- Roadmap generation prompt MUST include a `resources` array for every topic.
+## Environment Variables
+Never commit `.env.local`. Use `.env.example` as the template. Required keys:
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `GEMINI_API_KEY`
+- `NEXT_PUBLIC_APP_URL`

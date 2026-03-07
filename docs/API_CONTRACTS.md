@@ -3,6 +3,7 @@
 ## Career Recommendations
 **Method:** `POST`
 **Path:** `/api/recommend`
+**AI Powered By:** Google Gemini (`generateGemini`)
 **Request Payload:**
 ```json
 {
@@ -27,15 +28,25 @@
         "job_outlook": "growing"
       }
     ],
-    "analysis_summary": "AI generation metrics..."
+    "analysis_summary": "AI analysis summary..."
   }
 }
 ```
+**Error Response (No Fallback):**
+```json
+{
+  "success": false,
+  "error": "GEMINI_API_ERROR_429: You exceeded your current quota..."
+}
+```
 
-## Roadmap Management
+---
+
+## Roadmap Generation
 **Method:** `POST`
 **Path:** `/api/roadmap`
-**Purpose:** Generates a new AI roadmap or returns from cache. Links the result to the user profile and initializes progress.
+**AI Powered By:** Google Gemini (`generateGemini`)
+**Purpose:** Generates a new AI roadmap or returns from cache. Links the result to the user profile.
 **Request Payload:**
 ```json
 {
@@ -47,25 +58,47 @@
 
 **Method:** `GET`
 **Path:** `/api/roadmap?user_id=<uuid>` or `/api/roadmap?id=<roadmap_id>`
-**Purpose:** Retrieves a roadmap. If `user_id` is provided, it prioritizes the user's active progress or target career.
+**Purpose:** Retrieves a roadmap. If `user_id` is provided, prioritizes the user's active roadmap.
+
+---
 
 ## User Profile
 **Method:** `GET | POST | PATCH`
 **Path:** `/api/user`
 **Usage:**
-- `GET`: Fetch profile by `id` or `email` (supports password bypass).
-- `POST`: Create or upsert a profile.
-- `PATCH`: Partially update profile fields (e.g., updating target career).
+- `GET ?id=<uuid>` — Fetch profile by ID
+- `GET ?email=<email>&password=<pw>` — Fetch profile with login verification
+- `POST` — Create or upsert a profile (used at signup)
+- `PATCH ?id=<uuid>` — Partially update profile fields
 
-## AI Chat
+**POST Request Payload:**
+```json
+{
+  "id": "generated-uuid-or-fallback",
+  "email": "user@example.com",
+  "full_name": "John Doe",
+  "password": "plain-text-pw"
+}
+```
+
+---
+
+## AI Chatbot
 **Method:** `POST`
 **Path:** `/api/chat`
+**AI Powered By:** Google Gemini (`generateGemini`)
 **Request Payload:**
 ```json
 {
   "new_message": "How do I start with React?",
   "career_context": "Software Engineer",
-  "conversation_history": [],
+  "conversation_history": [
+    { "role": "user", "content": "Hello" },
+    { "role": "assistant", "content": "Hi! How can I help?" }
+  ],
   "user_id": "optional-uuid"
 }
 ```
+**Notes:**
+- Conversation history is capped at the last **5 messages** to minimize token usage.
+- No fallback response if Gemini fails — the exact error is returned.
