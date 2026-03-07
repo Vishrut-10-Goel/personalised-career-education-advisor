@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { callOllamaJSON } from "@/lib/ollama";
+import { generateGemini } from "@/lib/gemini";
 import { buildRecommendPrompt } from "@/lib/prompts";
+import { checkRateLimit } from "@/lib/rateLimiter";
 import type { RecommendRequestPayload, RecommendResponse } from "@/types/career";
 import type { ApiResponse } from "@/types/user";
 
-// ── Domain-based fallback when Ollama fails / returns invalid JSON ──
+// ── Domain-based fallback when AI fails / returns invalid JSON ──
 function makePath(
     title: string,
     description: string,
@@ -106,7 +107,20 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // ── Build prompt & call Ollama ───────────────────────────
+        // ── Rate Limiting (10 recommendations per user per day) ──
+        if (body.user_id) {
+            const { allowed, remaining, resetInMs } = checkRateLimit(body.user_id, "recommendations", 10);
+            if (!allowed) {
+                const resetMins = Math.ceil(resetInMs / 60000);
+                return NextResponse.json<ApiResponse>(
+                    { success: false, error: `Daily AI recommendation limit reached. Resets in ${resetMins} minutes.` },
+                    { status: 429, headers: { 'Retry-After': String(Math.ceil(resetInMs / 1000)) } }
+                );
+            }
+            console.log(`[/api/recommend] User ${body.user_id} — ${remaining} requests remaining today.`);
+        }
+
+        // ── Build prompt & call Gemini ───────────────────────────
         const prompt = buildRecommendPrompt({
             skills: body.skills,
             interests: body.interests ?? [],
@@ -125,23 +139,51 @@ export async function POST(req: NextRequest) {
                 setTimeout(() => reject(new Error("AI_TIMEOUT")), 300000)
             );
 
-            const aiPromise = callOllamaJSON<any>(prompt);
+            const aiPromise = (async () => {
+                const text = await generateGemini(prompt);
+                return JSON.parse(text);
+            })();
 
             const raw = await Promise.race([aiPromise, timeoutPromise]);
+            console.log("[/api/recommend] Gemini raw:", JSON.stringify(raw));
             const duration = ((Date.now() - startTime) / 1000).toFixed(1);
 
-            console.log(`[/api/recommend] Ollama responded in ${duration}s`);
+            console.log(`[/api/recommend] Gemini responded in ${duration}s`);
 
-            // Priority 1: Nested array format { recommendations: [{ title, description }] }
-            if (raw.recommendations && Array.isArray(raw.recommendations)) {
+            // Priority 1: Top-level array [{ title, description }]
+            if (Array.isArray(raw)) {
+                result = {
+                    recommendations: raw.map((r: any) =>
+                        makePath(
+                            r.title || r.name || "Untitled",
+                            r.description || r.desc || "No description",
+                            90,
+                            [],
+                            body.domain
+                        )
+                    ),
+                    analysis_summary: `${(raw as any).analysis_summary || "AI-generated recommendations."} (Generated in ${duration}s)`,
+                };
+            }
+            // Priority 2: Nested array format { recommendations: [{ title, description, ... }] }
+            else if (raw.recommendations && Array.isArray(raw.recommendations)) {
                 result = {
                     recommendations: raw.recommendations.map((r: any) => ({
-                        ...makePath(r.title || "Untitled", r.description || "No description", 90, [], body.domain)
+                        ...makePath(
+                            r.title || "Untitled",
+                            r.description || "No description",
+                            r.match_score ?? 85,
+                            Array.isArray(r.required_skills) ? r.required_skills : [],
+                            body.domain
+                        ),
+                        avg_salary_usd: typeof r.avg_salary_usd === "number" ? r.avg_salary_usd : 0,
+                        job_outlook: (r.job_outlook === "growing" || r.job_outlook === "stable" || r.job_outlook === "declining") ? r.job_outlook : "growing",
+                        time_to_entry_months: typeof r.time_to_entry_months === "number" ? r.time_to_entry_months : 12,
                     })),
                     analysis_summary: `${raw.analysis_summary || "AI-generated recommendations."} (Generated in ${duration}s)`,
                 };
             }
-            // Priority 2: Flat format { title1, desc1, ... }
+            // Priority 3: Flat format { title1, desc1, ... }
             else if (raw.title1 && raw.desc1) {
                 result = {
                     recommendations: [
@@ -151,13 +193,91 @@ export async function POST(req: NextRequest) {
                     ].filter(r => r.title),
                     analysis_summary: `${raw.summary || raw.analysis_summary || "AI-generated recommendations."} (Generated in ${duration}s)`,
                 };
+            }
+            // Priority 4: Heuristic — any array of objects; infer title/description fields
+            else if (typeof raw === "object" && raw !== null) {
+                const keys = Object.keys(raw);
+                let picked: any[] | null = null;
+
+                for (const key of keys) {
+                    const val = (raw as any)[key];
+                    if (
+                        Array.isArray(val) &&
+                        val.some((item: any) => item && typeof item === "object")
+                    ) {
+                        picked = val;
+                        break;
+                    }
+                }
+
+                if (picked) {
+                    result = {
+                        recommendations: picked.map((r: any, index: number) => {
+                            let title =
+                                r.title ||
+                                r.name ||
+                                r.career ||
+                                "";
+
+                            let description =
+                                r.description ||
+                                r.desc ||
+                                "";
+
+                            if (!title) {
+                                for (const k of Object.keys(r)) {
+                                    const v = (r as any)[k];
+                                    const lower = k.toLowerCase();
+                                    if (
+                                        typeof v === "string" &&
+                                        (lower.includes("title") ||
+                                            lower.includes("career") ||
+                                            lower.includes("role"))
+                                    ) {
+                                        title = v;
+                                        break;
+                                    }
+                                }
+                            }
+
+                            if (!description) {
+                                for (const k of Object.keys(r)) {
+                                    const v = (r as any)[k];
+                                    const lower = k.toLowerCase();
+                                    if (
+                                        typeof v === "string" &&
+                                        (lower.includes("description") ||
+                                            lower.includes("summary") ||
+                                            lower.includes("details"))
+                                    ) {
+                                        description = v;
+                                        break;
+                                    }
+                                }
+                            }
+
+                            if (!title) {
+                                title = `Option ${index + 1}`;
+                            }
+                            if (!description) {
+                                description = "AI-generated career option.";
+                            }
+
+                            return makePath(title, description, 90, [], body.domain);
+                        }),
+                        analysis_summary: `${(raw as any).analysis_summary || (raw as any).summary || "AI-generated recommendations."} (Generated in ${duration}s)`,
+                    };
+                } else {
+                    throw new Error("UNEXPECTED_JSON_SHAPE");
+                }
             } else {
                 throw new Error("UNEXPECTED_JSON_SHAPE");
             }
         } catch (error) {
             const duration = ((Date.now() - startTime) / 1000).toFixed(1);
             const errLabel = error instanceof Error ? error.message : "UNKNOWN";
-            console.warn(`[/api/recommend] AI ${errLabel} after ${duration}s, using fallback for ${body.domain}`);
+            console.error(`[/api/recommend] AI FAILED after ${duration}s — reason: ${errLabel}`);
+            console.error("[/api/recommend] Full error:", error);
 
             result = getFallback(body.domain);
             // Append the error to the summary so the user can see it in the UI cards

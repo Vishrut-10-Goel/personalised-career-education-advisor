@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { callOllamaChat } from "@/lib/ollama";
+import { generateGemini } from "@/lib/gemini";
 import { buildChatSystemPrompt } from "@/lib/prompts";
 import { getServerSupabase, TABLES } from "@/lib/supabase";
 import type { ChatRequestPayload, ChatResponse } from "@/types/chat";
@@ -28,13 +28,23 @@ export async function POST(req: NextRequest) {
                 content: m.content,
             }));
 
-        // ── Build system prompt & call Ollama ────────────────────
+        // ── Build system prompt & call AI ────────────────────
         const systemPrompt = buildChatSystemPrompt(body.career_context);
-        const reply = await callOllamaChat(
+        const conversationContext = history
+            .slice(-10)
+            .map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`)
+            .join("\n");
+
+        const fullPrompt = [
             systemPrompt,
-            history,
-            body.new_message.trim()
-        );
+            conversationContext ? `\n\nConversation so far:\n${conversationContext}` : "",
+            `\nUser: ${body.new_message.trim()}`,
+            "\nAssistant:",
+        ]
+            .filter(Boolean)
+            .join("");
+
+        const reply = await generateGemini(fullPrompt);
 
         // ── Optionally persist session ────────────────────────────
         let sessionId = body.session_id;

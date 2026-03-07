@@ -9,18 +9,36 @@ export const buildRecommendPrompt = (params: {
   education_level: EducationLevel | string;
   domain: Domain | string;
 }): string => {
-  return `Recommend 3 careers for a ${params.domain} student.
-Skills: ${params.skills.join(", ")}
-Interests: ${params.interests.join(", ")}
-Level: ${params.education_level}
+  return `You are a career advisor AI. Recommend exactly 3 careers for a student in the "${params.domain}" domain.
 
-Output ONLY valid JSON:
+Student profile:
+- Skills: ${params.skills.length > 0 ? params.skills.join(", ") : "not specified"}
+- Interests: ${params.interests.length > 0 ? params.interests.join(", ") : "not specified"}
+- Education level: ${params.education_level || "not specified"}
+
+IMPORTANT: Respond with ONLY a raw JSON object. No markdown, no code fences, no explanation before or after. Just the JSON.
+
+The response must be exactly this structure:
 {
   "recommendations": [
-    { "title": "Career Name", "description": "Short explanation." }
+    {
+      "title": "Career Title",
+      "description": "2-3 sentence description tailored to this student's skills and interests.",
+      "required_skills": ["skill1", "skill2", "skill3"],
+      "avg_salary_usd": 75000,
+      "job_outlook": "growing",
+      "time_to_entry_months": 12
+    }
   ],
-  "analysis_summary": "Short rationale."
-}`.trim();
+  "analysis_summary": "1-2 sentence summary of why these careers suit this student."
+}
+
+Rules:
+- job_outlook must be one of: "growing", "stable", "declining"
+- avg_salary_usd is an integer (USD annual salary)
+- time_to_entry_months is an integer
+- required_skills is an array of 3-5 strings
+- Do NOT include any text outside the JSON object`.trim();
 };
 
 // ─────────────────────────────────────────────
@@ -47,28 +65,54 @@ Output format:
     {
       "level": "Beginner",
       "topics": [
-        { "id": "b1", "title": "Topic Title", "description": "Brief description." },
-        { "id": "b2", "title": "Topic Title", "description": "Brief description." }
+        { 
+          "id": "b1", 
+          "title": "Topic Title", 
+          "description": "Brief description.",
+          "estimated_hours": 4,
+          "resources": [
+            { "title": "Resource Name", "url": "https://youtube.com/search?q=topic+tutorial", "type": "video" },
+            { "title": "Free Course", "url": "https://example.com/course", "type": "course" }
+          ]
+        }
       ]
     },
     {
       "level": "Intermediate",
       "topics": [
-        { "id": "i1", "title": "Topic Title", "description": "Brief description." },
-        { "id": "i2", "title": "Topic Title", "description": "Brief description." }
+        { 
+          "id": "i1", 
+          "title": "Topic Title", 
+          "description": "Brief description.",
+          "estimated_hours": 8,
+          "resources": [
+            { "title": "Deep Dive Video", "url": "https://youtube.com/search?q=topic+deep+dive", "type": "video" }
+          ]
+        }
       ]
     },
     {
       "level": "Advanced",
       "topics": [
-        { "id": "a1", "title": "Topic Title", "description": "Brief description." },
-        { "id": "a2", "title": "Topic Title", "description": "Brief description." }
+        { 
+          "id": "a1", 
+          "title": "Topic Title", 
+          "description": "Brief description.",
+          "estimated_hours": 12,
+          "resources": [
+            { "title": "Advanced Article", "url": "https://example.com/advanced-topic", "type": "article" }
+          ]
+        }
       ]
     }
   ]
 }
 
-Ensure at least 3 topics per section. Do not include any text outside the JSON.
+Rules:
+- Ensure 3-4 topics per section. 
+- RESOURCES ARE MANDATORY for every topic. 
+- Use real-looking URLs or valid search queries like https://youtube.com/search?q=...
+- Do not include any text outside the JSON object.
 `.trim();
 
 // ─────────────────────────────────────────────

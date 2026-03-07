@@ -2,41 +2,28 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { TrendingUp } from 'lucide-react';
 
 export default function Navbar() {
   const pathname = usePathname();
   const isDashboard = pathname.startsWith('/dashboard');
 
-  if (isDashboard) return null; // Dashboard has its own navbar
+  if (isDashboard) return null;
 
   return (
-    <nav className="glass-card-dark fixed top-0 left-0 right-0 z-50 border-0 border-b">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
-        {/* Logo */}
-        <Link href="/" className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-blue-500 rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-lg">A</span>
+    <nav className="fixed top-0 left-0 right-0 z-50 border-b border-white/5 bg-black/50 backdrop-blur-xl">
+      <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+        <Link href="/" className="flex items-center gap-3">
+          <div className="w-9 h-9 bg-primary rounded-xl flex items-center justify-center">
+            <TrendingUp size={20} className="text-black" />
           </div>
-          <span className="gradient-text font-bold text-lg hidden sm:inline">CareerAI</span>
+          <span className="text-2xl font-black tracking-tighter text-white">CareerVibe</span>
         </Link>
-
-        {/* Navigation */}
-        <div className="hidden md:flex items-center gap-8">
-          <Link href="#features" className="text-gray-300 hover:text-white transition-colors">
-            Features
-          </Link>
-          <Link href="#how-it-works" className="text-gray-300 hover:text-white transition-colors">
-            How It Works
-          </Link>
-        </div>
-
-        {/* Auth Links */}
-        <div className="flex items-center gap-3">
-          <Link href="/login" className="px-4 py-2 text-gray-300 hover:text-white transition-colors">
-            Login
-          </Link>
-          <Link href="/signup" className="px-4 py-2 rounded-lg gradient-button text-white font-medium hover-lift">
-            Sign Up
+        
+        <div className="flex items-center gap-8">
+          <Link href="/login" className="text-sm font-bold text-gray-400 hover:text-white transition-colors">Sign In</Link>
+          <Link href="/signup" className="neon-button text-sm px-6 py-2.5">
+            Start Now
           </Link>
         </div>
       </div>

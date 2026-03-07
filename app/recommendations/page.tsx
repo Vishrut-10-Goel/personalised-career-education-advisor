@@ -3,8 +3,10 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ChevronRight, Loader2, AlertCircle } from 'lucide-react';
+import { ChevronRight, Loader2, AlertCircle, TrendingUp, Target, Sparkles, ArrowRight } from 'lucide-react';
 import type { UserProfile } from '@/types/user';
+import { toTitleCase } from '@/lib/utils';
+import Sidebar from '@/components/Sidebar';
 
 interface Career {
     title: string;
@@ -22,22 +24,15 @@ export default function RecommendationsPage() {
     useEffect(() => {
         const fetchRecommendations = async () => {
             const storedUser = localStorage.getItem('activeUser');
-            if (!storedUser) {
-                router.push('/onboarding');
-                return;
-            }
+            if (!storedUser) return router.push('/onboarding');
 
             try {
                 const user: UserProfile = JSON.parse(storedUser);
-
-                // Fetch full profile to get latest skills/domain
                 const profileRes = await fetch(`/api/user?id=${user.id}`);
                 const profileData = await profileRes.json();
 
                 if (profileData.success && profileData.data) {
                     const profile: UserProfile = profileData.data;
-
-                    // Call recommend API
                     const recommendRes = await fetch('/api/recommend', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -55,11 +50,9 @@ export default function RecommendationsPage() {
                     } else {
                         setError(recommendData.error || "Failed to generate recommendations.");
                     }
-                } else {
-                    router.push('/onboarding');
                 }
             } catch (err) {
-                console.error("Failed to load recommendations:", err);
+                console.error(err);
                 setError("An error occurred while loading your career paths.");
             } finally {
                 setIsLoading(false);
@@ -78,9 +71,7 @@ export default function RecommendationsPage() {
         try {
             const res = await fetch('/api/roadmap', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     user_id: user.id,
                     career: career.title,
@@ -91,12 +82,9 @@ export default function RecommendationsPage() {
             const data = await res.json();
             if (data.success) {
                 router.push(`/roadmap?id=${data.data.roadmap.id}`);
-            } else {
-                alert(data.error || 'Failed to generate roadmap.');
             }
         } catch (error) {
-            console.error('Error generating roadmap:', error);
-            alert('Something went wrong. Please try again.');
+            console.error(error);
         } finally {
             setIsGenerating(null);
         }
@@ -104,76 +92,79 @@ export default function RecommendationsPage() {
 
     if (isLoading) {
         return (
-            <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
-                <Loader2 className="w-12 h-12 animate-spin text-purple-500 mb-4" />
-                <p className="text-gray-400">Finding careers that match your profile...</p>
+            <div className="min-h-screen bg-[#080808] flex flex-col items-center justify-center p-6 text-center gap-6">
+                <Loader2 className="w-16 h-16 animate-spin text-primary" />
+                <div className="space-y-2">
+                   <h2 className="text-2xl font-black uppercase tracking-tighter">AI Optimization in Progress...</h2>
+                   <p className="text-gray-500 font-bold uppercase tracking-widest text-[10px]">Scanning high-growth industries for your match</p>
+                </div>
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-background p-8">
-            <div className="max-w-3xl mx-auto">
-                <div className="mb-10">
-                    <Link href="/" className="inline-flex items-center gap-2 mb-6">
-                        <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-blue-500 rounded-lg flex items-center justify-center">
-                            <span className="text-white font-bold text-sm">C</span>
+        <div className="min-h-screen bg-[#080808] text-white">
+            <div className="max-w-5xl mx-auto py-20 px-6 space-y-16 fade-in">
+                {/* Header */}
+                <div className="space-y-8 flex flex-col items-center text-center">
+                    <Link href="/" className="inline-flex items-center gap-3">
+                        <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center shadow-[0_0_15px_rgba(198,255,0,0.2)]">
+                            <TrendingUp size={24} className="text-black" />
                         </div>
-                        <span className="gradient-text font-bold text-lg">Career Compass</span>
+                        <span className="text-3xl font-black tracking-tighter">CareerVibe</span>
                     </Link>
-                    <h1 className="text-4xl font-bold text-white mb-2">Tailored Career Paths</h1>
-                    <p className="text-gray-400">Based on your background and the {careers[0]?.domain} domain, here's where you could excel.</p>
+                    
+                    <div className="space-y-4">
+                        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 text-primary text-[10px] font-black uppercase tracking-widest">
+                          <Sparkles size={14} />
+                          Top AI Recommendations
+                        </div>
+                          <h1 className="text-5xl md:text-7xl font-black tracking-tighter leading-none">THE SHIFT IS <span className="text-primary">ON</span></h1>
+                        <p className="text-gray-500 max-w-2xl font-bold uppercase tracking-widest text-xs">We found industry gaps that perfectly match your current DNA. Choose your path to initialize.</p>
+                    </div>
                 </div>
 
                 {error && (
-                    <div className="glass-card p-6 rounded-2xl border-l-4 border-red-500 bg-red-500/10 mb-8 flex items-center gap-4">
-                        <AlertCircle className="text-red-400" size={24} />
-                        <p className="text-red-300">{error}</p>
+                    <div className="vibe-card p-6 border-red-500/20 bg-red-500/5 text-red-500 flex items-center gap-4 font-black uppercase tracking-widest text-sm">
+                        <AlertCircle size={24} />
+                        {error}
                     </div>
                 )}
 
-                {careers.length === 0 && !error ? (
-                    <div className="glass-card rounded-xl p-10 text-center">
-                        <p className="text-gray-400 text-lg">No recommendations found.</p>
-                        <Link href="/onboarding" className="inline-block mt-6 px-6 py-3 rounded-lg gradient-button text-white font-medium">
-                            Update Profile
-                        </Link>
-                    </div>
-                ) : (
-                    <div className="space-y-4">
-                        {careers.map((career, index) => (
-                            <div key={index} className="glass-card rounded-xl p-6 hover-lift transition-all border-l-2 border-transparent hover:border-purple-500/50">
-                                <div className="flex items-start justify-between gap-4">
-                                    <div className="flex-1">
-                                        <h2 className="text-xl font-bold text-white mb-2">{career.title}</h2>
-                                        <p className="text-gray-400 text-sm leading-relaxed mb-6">{career.description}</p>
-
-                                        <button
-                                            onClick={() => handleGenerateRoadmap(career)}
-                                            disabled={isGenerating !== null}
-                                            className="px-6 py-2.5 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 text-sm font-bold transition-all border border-purple-500/20 flex items-center gap-2 group"
-                                        >
-                                            {isGenerating === career.title ? (
-                                                <><Loader2 className="w-4 h-4 animate-spin" /> Preparing Roadmap...</>
-                                            ) : (
-                                                <>Build My Roadmap <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" /></>
-                                            )}
-                                        </button>
-                                    </div>
-                                    <div className="w-12 h-12 bg-white/5 rounded-xl flex items-center justify-center text-gray-500 font-bold shrink-0">
-                                        {index + 1}
-                                    </div>
+                {/* Careers Grid */}
+                <div className="grid gap-6">
+                    {careers.map((career, index) => (
+                        <div key={index} className="vibe-card p-10 flex flex-col md:flex-row items-center justify-between gap-10 hover:border-primary/40">
+                             <div className="flex-1 space-y-6 text-center md:text-left">
+                                <div className="space-y-3">
+                                  <div className="inline-block text-[10px] font-black uppercase text-gray-600 tracking-[0.3em]">{career.domain}</div>
+                                  <h2 className="text-4xl font-black tracking-tight">{toTitleCase(career.title)}</h2>
                                 </div>
-                            </div>
-                        ))}
+                                <p className="text-gray-400 leading-relaxed font-bold text-sm uppercase tracking-wider max-w-xl">
+                                  {career.description}
+                                </p>
+                             </div>
 
-                        <div className="pt-8 flex justify-center">
-                            <Link href="/onboarding" className="text-gray-500 hover:text-white text-sm transition-colors border-b border-transparent hover:border-gray-500">
-                                Want to change your domain? Redo Onboarding
-                            </Link>
+                             <button
+                                onClick={() => handleGenerateRoadmap(career)}
+                                disabled={isGenerating !== null}
+                                className="neon-button px-10 py-5 text-xl whitespace-nowrap min-w-[280px]"
+                             >
+                                {isGenerating === career.title ? (
+                                    <><Loader2 className="w-6 h-6 animate-spin mr-2" /> BUILDING...</>
+                                ) : (
+                                    <>MAP THIS PATH <ArrowRight size={22} className="ml-2" /></>
+                                )}
+                             </button>
                         </div>
-                    </div>
-                )}
+                    ))}
+                </div>
+
+                <div className="pt-20 text-center">
+                    <button onClick={() => router.push('/onboarding')} className="text-gray-700 font-bold text-xs uppercase tracking-[0.4em] hover:text-white transition-colors border-b border-white/5 pb-2">
+                        Redo Intel Sync // Re-Onboard
+                    </button>
+                </div>
             </div>
         </div>
     );

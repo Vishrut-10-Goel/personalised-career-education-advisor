@@ -6,7 +6,7 @@ import axios from "axios";
 const OLLAMA_BASE_URL =
     process.env.OLLAMA_BASE_URL ?? "http://localhost:11434";
 
-const OLLAMA_MODEL = process.env.OLLAMA_MODEL ?? "llama3:8b";
+const OLLAMA_MODEL = process.env.OLLAMA_MODEL ?? "llama3.2:1b";
 
 // ─────────────────────────────────────────────
 // Core: single-turn text completion
@@ -128,4 +128,22 @@ export async function callOllamaChat(
         .join("");
 
     return callOllama(fullPrompt);
+}
+
+export async function generateOllama(prompt: string) {
+    const res = await fetch(`${OLLAMA_BASE_URL}/api/generate`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+            model: OLLAMA_MODEL,
+            prompt,
+            stream: false,
+        }),
+    });
+
+    const data = await res.json();
+
+    return data.response || "";
 }

@@ -1,8 +1,15 @@
+export interface RoadmapResource {
+    title: string;
+    url: string;
+    type: "video" | "article" | "course";
+}
+
 export interface RoadmapTopic {
     id: string; // Deterministic stable ID
     title: string;
     description: string;
     estimated_hours: number;
+    resources?: RoadmapResource[];
 }
 
 export interface RoadmapSection {

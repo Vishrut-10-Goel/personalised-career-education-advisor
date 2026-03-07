@@ -29,28 +29,61 @@ export default function ChatUI() {
   }, [messages]);
 
   const handleSend = async () => {
-    if (!input.trim()) return;
+    const trimmed = input.trim();
+    if (!trimmed) return;
 
-    // Add user message
+    // Add user message locally
     const userMessage: Message = {
       id: Date.now().toString(),
       type: 'user',
-      content: input,
+      content: trimmed,
     };
-    setMessages((prev) => [...prev, userMessage]);
+
+    const updatedMessages = [...messages, userMessage];
+    setMessages(updatedMessages);
     setInput('');
     setIsLoading(true);
 
-    // Simulate AI response
-    setTimeout(() => {
+    try {
+      // Build conversation history for the API
+      const conversation_history = updatedMessages.map((m) => ({
+        role: m.type === 'user' ? 'user' : 'assistant',
+        content: m.content,
+      }));
+
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          conversation_history,
+          new_message: trimmed,
+        }),
+      });
+
+      const json = await res.json();
+
+      const reply: string =
+        (json?.data && json.data.reply) ||
+        json?.reply ||
+        'Sorry, I was unable to generate a response. Please try again.';
+
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
         type: 'ai',
-        content: 'That\'s a great question! Based on your profile, I recommend focusing on developing these key skills first. Let me create a personalized roadmap for you.',
+        content: reply,
+      };
+
+      setMessages((prev) => [...prev, aiMessage]);
+    } catch (error) {
+      const aiMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        type: 'ai',
+        content: 'There was an error talking to the AI chatbot. Please check that Ollama is running and try again.',
       };
       setMessages((prev) => [...prev, aiMessage]);
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   return (

@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import DashboardCard from '@/components/DashboardCard';
-import { TrendingUp, Zap, Target, Loader2 } from 'lucide-react';
+import { TrendingUp, Zap, Target, Loader2, BookOpen, Clock, ChevronRight } from 'lucide-react';
 import type { UserProgress, Roadmap } from '@/types/roadmap';
+import { toTitleCase } from '@/lib/utils';
 
 export default function ProgressPage() {
   const router = useRouter();
@@ -16,14 +16,10 @@ export default function ProgressPage() {
   useEffect(() => {
     const fetchAllProgress = async () => {
       const storedUser = localStorage.getItem('activeUser');
-      if (!storedUser) {
-        router.push('/onboarding');
-        return;
-      }
+      if (!storedUser) return router.push('/onboarding');
       const user = JSON.parse(storedUser);
 
       try {
-        // 1. Fetch all progress rows
         const res = await fetch(`/api/progress?user_id=${user.id}`);
         const data = await res.json();
 
@@ -31,7 +27,6 @@ export default function ProgressPage() {
           const rows: UserProgress[] = data.data || [];
           setProgressRows(rows);
 
-          // 2. Fetch all unique roadmaps to count total topics and get titles
           const roadmapIds = Array.from(new Set(rows.map(r => r.roadmap_id)));
           let totalCount = 0;
           let completedTitles: string[] = [];
@@ -45,11 +40,8 @@ export default function ProgressPage() {
                 const roadmap: Roadmap = rr.data.roadmap;
                 const roadmapProgress = rows.find(r => r.roadmap_id === roadmap.id);
 
-                // Count all topics in this roadmap
                 roadmap.sections.forEach(s => {
                   totalCount += (s.topics || []).length;
-
-                  // Collect titles of completed topics
                   if (roadmapProgress) {
                     s.topics.forEach(t => {
                       if (roadmapProgress.completed_topic_ids.includes(t.id)) {
@@ -66,7 +58,7 @@ export default function ProgressPage() {
           setCompletedTopicTitles(completedTitles);
         }
       } catch (error) {
-        console.error("Failed to fetch progress metrics:", error);
+        console.error(error);
       } finally {
         setIsLoading(false);
       }
@@ -77,143 +69,101 @@ export default function ProgressPage() {
 
   const totalCompleted = completedTopicTitles.length;
   const overallPercent = totalTopicsCount > 0 ? Math.floor((totalCompleted / totalTopicsCount) * 100) : 0;
-
-  // Simulated stats for UI consistency (as DB doesn't track these yet)
-  const streak = progressRows.length > 0 ? 3 : 0;
-  const totalHours = (totalCompleted * 0.5); // Estimate 30 mins per topic
+  const totalHours = (totalCompleted * 0.5);
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
-        <Loader2 className="w-12 h-12 animate-spin text-purple-500 mb-4" />
-        <p className="text-gray-400">Loading your progress data...</p>
+      <div className="flex flex-col items-center justify-center pt-20">
+        <Loader2 className="w-12 h-12 animate-spin text-primary mb-4" />
+        <p className="text-gray-500 font-bold uppercase tracking-widest text-xs">Syncing library...</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-8 fade-in">
+    <div className="max-w-6xl mx-auto space-y-12 fade-in pt-4">
       {/* Header */}
-      <div className="glass-card p-8 rounded-2xl border-l-4 border-green-500">
-        <h1 className="text-3xl font-bold text-white mb-2">Your Progress Tracker</h1>
-        <p className="text-gray-400">Monitor your learning journey and track your achievements</p>
+      <div className="flex flex-col gap-2">
+        <h1 className="text-4xl font-black tracking-tight text-white">
+          My <span className="text-primary font-bold">Library</span>
+        </h1>
+        <p className="text-gray-500 font-medium">Archive of your mastered skills and active paths.</p>
       </div>
 
-      {/* Stats Cards */}
+      {/* Stats Summary */}
       <div className="grid md:grid-cols-3 gap-6">
-        <DashboardCard title="Estimated Effort">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-gray-400 text-sm mb-1">Estimated Effort</p>
-              <p className="text-3xl font-bold gradient-text">{totalHours.toFixed(1)}h</p>
-              <p className="text-xs text-gray-500 mt-1">Total invested</p>
+        <div className="vibe-card p-8 flex items-center justify-between group">
+            <div className="space-y-1">
+               <p className="text-xs font-black uppercase tracking-widest text-gray-600">Time Invested</p>
+               <p className="text-4xl font-black text-white">{totalHours.toFixed(1)}h</p>
             </div>
-            <div className="w-12 h-12 rounded-lg bg-purple-500/20 flex items-center justify-center">
-              <TrendingUp className="text-purple-400" size={24} />
-            </div>
-          </div>
-        </DashboardCard>
+            <Clock size={32} className="text-primary/20 group-hover:text-primary transition-colors" />
+        </div>
 
-        <DashboardCard title="Active Paths">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-gray-400 text-sm mb-1">Active Paths</p>
-              <p className="text-3xl font-bold gradient-text">{progressRows.length}</p>
-              <p className="text-xs text-gray-500 mt-1">Roadmaps in progress</p>
+        <div className="vibe-card p-8 flex items-center justify-between group">
+            <div className="space-y-1">
+               <p className="text-xs font-black uppercase tracking-widest text-gray-600">Active Path Count</p>
+               <p className="text-4xl font-black text-white">{progressRows.length}</p>
             </div>
-            <div className="w-12 h-12 rounded-lg bg-orange-500/20 flex items-center justify-center">
-              <Zap className="text-orange-400" size={24} />
-            </div>
-          </div>
-        </DashboardCard>
+            <BookOpen size={32} className="text-primary/20 group-hover:text-primary transition-colors" />
+        </div>
 
-        <DashboardCard title="Topics">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-gray-400 text-sm mb-1">Topics</p>
-              <p className="text-3xl font-bold gradient-text">{totalCompleted}</p>
-              <p className="text-xs text-gray-500 mt-1">Completed across all paths</p>
+        <div className="vibe-card p-8 flex items-center justify-between group">
+            <div className="space-y-1">
+               <p className="text-xs font-black uppercase tracking-widest text-gray-600">Total Mastery</p>
+               <p className="text-4xl font-black text-white">{totalCompleted}</p>
             </div>
-            <div className="w-12 h-12 rounded-lg bg-green-500/20 flex items-center justify-center">
-              <Target className="text-green-400" size={24} />
-            </div>
-          </div>
-        </DashboardCard>
+            <Target size={32} className="text-primary/20 group-hover:text-primary transition-colors" />
+        </div>
       </div>
 
-      {/* Main Progress Tracker */}
-      <div className="glass-card p-8 rounded-2xl">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h3 className="text-xl font-bold text-white mb-1">Global Completion</h3>
-            <p className="text-gray-400 text-sm">Overall mastery across all enrolled careers</p>
+      {/* Real Progress Metrics */}
+      <div className="vibe-card p-12 space-y-12">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
+            <div className="space-y-4">
+               <h3 className="text-3xl font-black text-white leading-none">Global Mastery Matrix</h3>
+               <p className="text-gray-500 font-medium">Your overall performance across all sectors.</p>
+            </div>
+            <div className="flex items-baseline gap-2">
+               <span className="text-6xl font-black text-primary">{overallPercent}%</span>
+               <span className="text-gray-700 font-black text-xs uppercase tracking-widest">Global Rank</span>
+            </div>
           </div>
-          <div className="text-right">
-            <span className="text-3xl font-bold text-white">{overallPercent}%</span>
-            <p className="text-xs text-gray-500 uppercase tracking-wider">Total Progress</p>
+
+          <div className="h-4 w-full bg-white/5 rounded-full overflow-hidden">
+             <div 
+               className="h-full bg-primary transition-all duration-1000 ease-out"
+               style={{ width: `${overallPercent}%` }}
+             />
           </div>
-        </div>
 
-        <div className="w-full h-4 bg-white/5 rounded-full overflow-hidden mb-12">
-          <div
-            className="h-full bg-gradient-to-r from-green-500 to-emerald-500 transition-all duration-1000"
-            style={{ width: `${overallPercent}%` }}
-          />
-        </div>
-
-        <div className="grid md:grid-cols-2 gap-8">
-          <div>
-            <h4 className="text-sm font-semibold text-gray-400 uppercase tracking-widest mb-4">Recently Completed</h4>
-            <div className="space-y-3 max-h-96 overflow-y-auto pr-2 custom-scrollbar">
-              {completedTopicTitles.length > 0 ? completedTopicTitles.map((title, idx) => (
-                <div key={idx} className="flex items-center gap-3 p-3 glass-card-dark rounded-lg border-l-2 border-green-500/50">
-                  <Target className="text-green-500" size={16} />
-                  <span className="text-sm text-gray-200">{title}</span>
+          <div className="grid md:grid-cols-2 gap-12 border-t border-white/5 pt-12">
+             <div className="space-y-6">
+                <h4 className="text-xs font-black text-gray-600 uppercase tracking-[0.3em]">Freshly Mastered</h4>
+                <div className="space-y-3">
+                   {completedTopicTitles.length > 0 ? completedTopicTitles.slice(0, 10).map((title, i) => (
+                      <div key={i} className="flex items-center gap-4 p-4 vibe-card bg-white/[0.02]">
+                         <div className="w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_8px_rgba(198,255,0,0.8)]" />
+                         <span className="text-sm font-bold text-gray-200">{toTitleCase(title)}</span>
+                      </div>
+                   )) : (
+                      <p className="text-gray-500 font-bold uppercase tracking-widest text-[10px]">No intel collected yet.</p>
+                   )}
                 </div>
-              )) : (
-                <p className="text-gray-500 text-sm italic">No topics completed yet. Keep learning!</p>
-              )}
-            </div>
-          </div>
+             </div>
 
-          <div className="flex flex-col justify-center bg-white/3 rounded-2xl p-6 border border-white/5">
-            <div className="text-center">
-              <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-green-500/10 mb-4">
-                <Zap className="text-green-400" size={32} />
-              </div>
-              <h4 className="text-white font-bold mb-2">Keep the Momentum!</h4>
-              <p className="text-gray-400 text-sm mb-6">
-                You have completed {totalCompleted} out of {totalTopicsCount} topics.
-                Stay consistent to reach your career goals.
-              </p>
-              <button
-                onClick={() => router.push('/dashboard')}
-                className="px-6 py-2 rounded-lg gradient-button text-white text-sm font-medium hover-lift"
-              >
-                Continue Learning
-              </button>
-            </div>
+             <div className="vibe-card p-8 bg-primary/5 border-primary/20 flex flex-col items-center justify-center text-center gap-6">
+                 <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
+                    <Zap size={32} />
+                 </div>
+                 <h4 className="text-xl font-black">Hustle Logic Active</h4>
+                 <p className="text-gray-500 font-medium">You have initialized {progressRows.length} career paths. Keep shipping topics to level up your Matrix rank.</p>
+                 <button onClick={() => router.push('/dashboard')} className="neon-button px-8 py-3 w-full">
+                    Resume Active Path
+                 </button>
+             </div>
           </div>
-        </div>
       </div>
-
-      {/* Achievements Fallback */}
-      <DashboardCard title="Achievements & Badges">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {[
-            { icon: '🌱', label: 'Starter', active: totalCompleted >= 1 },
-            { icon: '🔥', label: 'Motivated', active: totalCompleted >= 5 },
-            { icon: '📚', label: 'Learner', active: totalCompleted >= 15 },
-            { icon: '🎓', label: 'Expert', active: totalCompleted >= 30 },
-          ].map((badge, idx) => (
-            <div key={idx} className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${badge.active ? 'glass-card border-green-500/30' : 'bg-white/2 opacity-30 border-transparent grayscale'
-              }`}>
-              <span className="text-3xl">{badge.icon}</span>
-              <span className={`text-xs font-bold ${badge.active ? 'text-white' : 'text-gray-500'}`}>{badge.label}</span>
-            </div>
-          ))}
-        </div>
-      </DashboardCard>
     </div>
   );
 }

@@ -1,37 +1,25 @@
 import type { Metadata, Viewport } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
+import QueryProvider from '@/components/providers/QueryProvider'
 import './globals.css'
 
 const geist = Geist({ subsets: ["latin"] });
 const geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'Personalised Career Education Advisor',
-  description: 'AI-powered career guidance with personalized learning roadmaps, skill gap analysis, and AI mentor support',
-  generator: 'v0.app',
-  keywords: ['career', 'education', 'AI', 'learning', 'roadmap', 'placement'],
+  title: 'CareerVibe — Future-Proof Your Career',
+  description: 'AI-powered career intelligence for the next generation. Build roadmaps, track skill gaps, and pivot like a pro. Powered by CareerVibe AI.',
+  generator: 'CareerVibe',
+  keywords: ['career', 'education', 'AI', 'learning', 'roadmap', 'genz', 'hustle', 'careerAI'],
   icons: {
-    icon: [
-      {
-        url: '/icon-light-32x32.png',
-        media: '(prefers-color-scheme: light)',
-      },
-      {
-        url: '/icon-dark-32x32.png',
-        media: '(prefers-color-scheme: dark)',
-      },
-      {
-        url: '/icon.svg',
-        type: 'image/svg+xml',
-      },
-    ],
+    icon: '/icon.svg',
     apple: '/apple-icon.png',
   },
 }
 
 export const viewport: Viewport = {
-  themeColor: '#0f0117',
+  themeColor: '#080808',
   width: 'device-width',
   initialScale: 1,
   maximumScale: 5,
@@ -45,8 +33,15 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark" style={{ colorScheme: 'dark' }}>
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet" />
+      </head>
       <body className={`${geist.className} font-sans antialiased bg-background text-foreground`}>
-        {children}
+        <QueryProvider>
+          {children}
+        </QueryProvider>
         <Analytics />
       </body>
     </html>

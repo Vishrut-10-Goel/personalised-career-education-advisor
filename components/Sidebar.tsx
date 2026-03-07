@@ -5,90 +5,107 @@ import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard,
   BookOpen,
-  Target,
   MessageCircle,
   TrendingUp,
   LogOut,
-  Menu,
-  X,
+  ChevronRight,
+  Target
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { toTitleCase } from '@/lib/utils';
+import type { UserProfile } from '@/types/user';
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/dashboard/roadmap', label: 'Roadmap', icon: BookOpen },
+  { href: '/dashboard/skill-gap', label: 'Skill Gap', icon: Target },
   { href: '/dashboard/chatbot', label: 'AI Chatbot', icon: MessageCircle },
-  { href: '/dashboard/progress', label: 'Progress', icon: TrendingUp },
+  { href: '/dashboard/progress', label: 'My Library', icon: TrendingUp },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const [isOpen, setIsOpen] = useState(false);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [showDetails, setShowDetails] = useState(false);
+
+  useEffect(() => {
+    const stored = localStorage.getItem('activeUser');
+    if (stored) {
+      setProfile(JSON.parse(stored));
+    }
+  }, []);
 
   return (
-    <>
-      {/* Mobile Toggle */}
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="md:hidden fixed top-4 left-4 z-40 p-2 glass-card-dark text-white"
-      >
-        {isOpen ? <X size={24} /> : <Menu size={24} />}
-      </button>
-
-      {/* Sidebar */}
-      <aside className={`fixed left-0 top-0 h-screen glass-card-dark border-r border-white/10 pt-20 md:pt-0 transition-transform duration-300 z-30 w-64 ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
-        }`}>
-        <div className="p-6 space-y-8">
-          {/* Logo */}
-          <Link href="/" className="flex items-center gap-2 pt-4 md:pt-0">
-            <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-blue-500 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold">A</span>
-            </div>
-            <span className="gradient-text font-bold">CareerAI</span>
-          </Link>
-
-          {/* Navigation */}
-          <nav className="space-y-2">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = pathname === item.href;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setIsOpen(false)}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${isActive
-                      ? 'glass-card bg-purple-500/20 text-purple-300 border-l-2 border-purple-500'
-                      : 'text-gray-300 hover:text-white hover:bg-white/5'
-                    }`}
-                >
-                  <Icon size={20} />
-                  <span className="font-medium">{item.label}</span>
-                </Link>
-              );
-            })}
-          </nav>
-
-          {/* Logout */}
-          <div className="pt-8 border-t border-white/10">
-            <Link
-              href="/"
-              className="flex items-center gap-3 px-4 py-3 rounded-lg text-red-400 hover:bg-red-500/10 transition-all"
-            >
-              <LogOut size={20} />
-              <span className="font-medium">Logout</span>
-            </Link>
-          </div>
+    <aside className="fixed left-0 top-0 h-screen w-64 bg-[#0a0a0a] border-r border-white/5 p-6 flex flex-col gap-8 z-50">
+      {/* Brand */}
+      <Link href="/" className="flex items-center gap-3 px-2">
+        <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center shadow-[0_0_15px_rgba(198,255,0,0.2)]">
+          <TrendingUp size={22} className="text-black" />
         </div>
-      </aside>
+        <span className="text-2xl font-black tracking-tighter text-white">CareerVibe</span>
+      </Link>
 
-      {/* Mobile Overlay */}
-      {isOpen && (
-        <div
-          className="fixed inset-0 bg-black/50 z-20 md:hidden"
-          onClick={() => setIsOpen(false)}
-        />
+      {/* Actual Navigation */}
+      <nav className="flex flex-col gap-2 flex-1">
+        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-500 px-2 mb-2">Navigator</p>
+        {navItems.map((item) => {
+          const Icon = item.icon;
+          const isActive = pathname === item.href;
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`sidebar-link ${isActive ? 'sidebar-link-active' : ''}`}
+            >
+              <Icon size={20} />
+              <span className="text-sm font-bold">{item.label}</span>
+              {isActive && <ChevronRight size={14} className="ml-auto" />}
+            </Link>
+          );
+        })}
+      </nav>
+
+      {/* Clean User Profile (Real Data) */}
+      {profile && (
+        <div className="mt-auto pt-6 border-t border-white/5 space-y-2">
+          <div 
+            className="flex items-center gap-3 px-2 cursor-pointer hover:bg-white/5 p-2 rounded-xl transition-all"
+            onClick={() => setShowDetails(!showDetails)}
+          >
+            <div className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white font-bold">
+              {(profile.full_name?.[0] || 'U').toUpperCase()}
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-bold text-white truncate">{toTitleCase(profile.full_name || 'Member')}</p>
+              <p className="text-[10px] text-gray-500 truncate font-bold uppercase">Member</p>
+            </div>
+          </div>
+
+          {showDetails && (
+            <div className="px-3 py-4 bg-white/5 rounded-2xl border border-white/10 space-y-2 animate-in slide-in-from-bottom-2 fade-in">
+              <div className="space-y-0.5">
+                <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Full Name</p>
+                <p className="text-xs font-bold text-white leading-tight">{toTitleCase(profile.full_name || 'N/A')}</p>
+              </div>
+              <div className="space-y-0.5">
+                <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Identity</p>
+                <p className="text-[10px] font-bold text-white leading-tight truncate">{profile.email}</p>
+              </div>
+            </div>
+          )}
+          
+          <button
+            onClick={() => {
+              localStorage.removeItem('activeUser');
+              window.location.href = '/';
+            }}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-500 hover:bg-red-500/10 transition-all font-bold text-sm"
+          >
+            <LogOut size={18} />
+            Logout
+          </button>
+        </div>
       )}
-    </>
+    </aside>
   );
 }
