@@ -163,8 +163,9 @@ function normaliseSections(rawSections: any[]): RoadmapSection[] {
 }
 
 export async function POST(req: NextRequest) {
+    let body: any = {};
     try {
-        const body: RoadmapRequestPayload = await req.json();
+        body = await req.json();
 
         // ── Validation ──────────────────────────────────────────
         if (!body.career?.trim()) {
@@ -290,15 +291,14 @@ export async function POST(req: NextRequest) {
             success: true,
             data: { roadmap },
         });
+
     } catch (error) {
-        console.error("[/api/roadmap] Error:", error);
+        console.error("[/api/roadmap] AI Failed:", error);
+
         return NextResponse.json<ApiResponse>(
             {
                 success: false,
-                error:
-                    error instanceof Error
-                        ? error.message
-                        : "An unexpected error occurred.",
+                error: error instanceof Error ? error.message : "An unexpected error occurred in AI generation.",
             },
             { status: 500 }
         );

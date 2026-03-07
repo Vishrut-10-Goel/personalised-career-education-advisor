@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generateGemini } from "@/lib/gemini";
+import { generateGeminiChat } from "@/lib/gemini";
 import { buildChatSystemPrompt } from "@/lib/prompts";
 import { getServerSupabase, TABLES } from "@/lib/supabase";
 import type { ChatRequestPayload, ChatResponse } from "@/types/chat";
 import type { ApiResponse } from "@/types/user";
 
-const MAX_HISTORY_MESSAGES = 20;
+const MAX_HISTORY_MESSAGES = 5;
 
 export async function POST(req: NextRequest) {
     try {
@@ -31,7 +31,6 @@ export async function POST(req: NextRequest) {
         // ── Build system prompt & call AI ────────────────────
         const systemPrompt = buildChatSystemPrompt(body.career_context);
         const conversationContext = history
-            .slice(-10)
             .map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`)
             .join("\n");
 
@@ -44,7 +43,7 @@ export async function POST(req: NextRequest) {
             .filter(Boolean)
             .join("");
 
-        const reply = await generateGemini(fullPrompt);
+        let reply: string = await generateGeminiChat(fullPrompt);
 
         // ── Optionally persist session ────────────────────────────
         let sessionId = body.session_id;
@@ -103,7 +102,7 @@ export async function POST(req: NextRequest) {
                 error:
                     error instanceof Error
                         ? error.message
-                        : "An unexpected error occurred.",
+                        : "An unexpected error occurred during AI generation.",
             },
             { status: 500 }
         );

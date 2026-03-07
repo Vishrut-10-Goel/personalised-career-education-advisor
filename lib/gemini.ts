@@ -74,36 +74,40 @@ async function callGeminiModel(prompt: string, model: string): Promise<string> {
 
   if (!rawText) {
     console.warn(`[generateGemini/${model}] Empty response. Full response:`, JSON.stringify(data));
-    return "{}";
+    return "";
   }
 
   console.log(`[generateGemini/${model}] Raw response:`, rawText.slice(0, 200));
 
-  // Always return a valid JSON string (or "{}" as a safe fallback)
-  return extractJSON(rawText);
+  // Return the raw text, extraction will happen higher up
+  return rawText;
 }
 
-// Models to try in order — falls back if quota exceeded
-// Verified available models for this API key:
+// Models prioritized for lightweight operation (Free-Tier Friendly)
 const GEMINI_MODELS = [
-  "gemini-2.0-flash",
-  "gemini-2.0-flash-lite",
+  "gemini-flash-lite-latest",
+  "gemini-1.5-flash-8b",
   "gemini-flash-latest",
-  "gemini-pro-latest"
+  "gemini-1.5-flash",
 ];
 
-export async function generateGemini(prompt: string): Promise<string> {
+export async function generateGemini(prompt: string, expectJson: boolean = true): Promise<string> {
   let lastError: Error | null = null;
+  const attemptedModels: string[] = [];
 
   for (const model of GEMINI_MODELS) {
     try {
       console.log(`[generateGemini] Attempting with model: ${model}`);
+      attemptedModels.push(model);
       const result = await callGeminiModel(prompt, model);
-      console.log(`[generateGemini] Success with model: ${model}`);
-      return result;
+      console.log(`[generateGemini] SUCCESS with model: ${model}`);
+      return expectJson ? extractJSON(result) : result;
     } catch (err: any) {
       lastError = err instanceof Error ? err : new Error(String(err));
       const msg = lastError.message;
+
+      // Log the specific failure for this model
+      console.warn(`[generateGemini] Model ${model} failed: ${msg.split(':').pop()?.trim()}`);
 
       // Check for quota/rate-limit errors or model not found (in case of aliasing issues)
       if (
@@ -111,9 +115,11 @@ export async function generateGemini(prompt: string): Promise<string> {
         msg.includes("RESOURCE_EXHAUSTED") || 
         msg.includes("quota") ||
         msg.includes("404") ||
-        msg.includes("not found")
+        msg.includes("not found") ||
+        msg.includes("limit") ||
+        msg.includes("not supported")
       ) {
-        console.warn(`[generateGemini] Model ${model} failed (Reason: ${msg.split(':').pop()}), trying next...`);
+        console.warn(`[generateGemini] Attempting fallback...`);
         continue;
       }
 
@@ -124,6 +130,11 @@ export async function generateGemini(prompt: string): Promise<string> {
   }
 
   // All models exhausted
-  console.error("[generateGemini] All fallback models exhausted or quota-limited.");
-  throw lastError ?? new Error("All Gemini models exhausted");
+  const finalErrorMsg = `All Gemini models exhausted. Attempted: ${attemptedModels.join(", ")}. Last Error: ${lastError?.message}`;
+  console.error(`[generateGemini] ${finalErrorMsg}`);
+  throw new Error(finalErrorMsg);
+}
+
+export async function generateGeminiChat(prompt: string): Promise<string> {
+  return generateGemini(prompt, false);
 }

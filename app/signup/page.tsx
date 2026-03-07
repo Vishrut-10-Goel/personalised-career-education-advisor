@@ -26,7 +26,10 @@ export default function SignupPage() {
         throw new Error("Please enter a valid email address.");
       }
 
-      const simulatedId = crypto.randomUUID();
+      // Fallback for crypto.randomUUID() if not available (non-secure context or older browser)
+      const simulatedId = (typeof crypto !== 'undefined' && crypto.randomUUID) 
+        ? crypto.randomUUID() 
+        : `user_${Math.random().toString(36).substring(2, 15)}_${Date.now()}`;
       const profileRes = await fetch('/api/user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

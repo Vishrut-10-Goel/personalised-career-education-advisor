@@ -5,90 +5,6 @@ import { checkRateLimit } from "@/lib/rateLimiter";
 import type { RecommendRequestPayload, RecommendResponse } from "@/types/career";
 import type { ApiResponse } from "@/types/user";
 
-// ── Domain-based fallback when AI fails / returns invalid JSON ──
-function makePath(
-    title: string,
-    description: string,
-    match_score: number,
-    required_skills: string[],
-    domain: string,
-): RecommendResponse["recommendations"][number] {
-    return {
-        title,
-        description,
-        match_score,
-        required_skills,
-        domain: domain as import("@/types/user").Domain,
-        avg_salary_usd: 0,
-        job_outlook: "growing",
-        time_to_entry_months: 12,
-        learning_resources: [],
-    };
-}
-
-function getFallback(domain: string): RecommendResponse {
-    const map: Record<string, RecommendResponse["recommendations"]> = {
-        "Technology & IT": [
-            makePath("Software Engineer", "Build and maintain software systems across web, mobile, and backend platforms.", 90, ["Programming", "Problem Solving", "Teamwork"], domain),
-            makePath("Data Scientist", "Extract insights from data using statistics, machine learning, and visualisation tools.", 85, ["Python", "Statistics", "Analysis"], domain),
-            makePath("Cloud DevOps Engineer", "Manage cloud infrastructure, CI/CD pipelines, and system reliability.", 80, ["Linux", "AWS/Azure", "Automation"], domain),
-        ],
-        "Medical & Healthcare": [
-            makePath("MBBS Doctor", "Diagnose and treat patients across a broad range of medical conditions.", 90, ["Biology", "Communication", "Critical Thinking"], domain),
-            makePath("Nurse Practitioner", "Provide direct patient care and coordinate healthcare plans in clinical settings.", 85, ["Clinical Skills", "Empathy", "Teamwork"], domain),
-            makePath("Medical Researcher", "Conduct scientific research to advance treatments and medical knowledge.", 80, ["Research", "Lab Skills", "Analysis"], domain),
-        ],
-        "Arts & Creative": [
-            makePath("Animator", "Create high-quality animations and visual effects for film and games.", 90, ["Drawing", "Software", "Creativity"], domain),
-            makePath("Creative Director", "Lead visual style and strategy for branding and multimedia campaigns.", 85, ["Leadership", "Design", "Vision"], domain),
-            makePath("Fine Artist", "Express concepts and emotions through varied physical or digital media.", 80, ["Technique", "Creativity", "Portfolio"], domain),
-        ],
-        "Commerce & Finance": [
-            makePath("Chartered Accountant", "Manage financial planning, auditing, and tax compliance for organisations.", 90, ["Accounting", "Analysis", "Attention to Detail"], domain),
-            makePath("Investment Analyst", "Evaluate financial markets and guide investment decisions for clients.", 85, ["Finance", "Research", "Communication"], domain),
-            makePath("Business Consultant", "Advise organisations on strategy, operations, and business growth.", 80, ["Problem Solving", "Leadership", "Communication"], domain),
-        ],
-        "Government & Civil Services": [
-            makePath("IAS Officer", "Administer public policy and government operations across districts and states.", 90, ["Leadership", "Communication", "Analysis"], domain),
-            makePath("Policy Analyst", "Research and recommend policy solutions for government and public sector bodies.", 85, ["Research", "Writing", "Critical Thinking"], domain),
-            makePath("Defence Officer", "Serve in the armed forces, managing national security and operations.", 80, ["Leadership", "Discipline", "Teamwork"], domain),
-        ],
-        "Research & Academia": [
-            makePath("Research Scientist", "Conduct advanced experiments to discover and validate new scientific theories.", 90, ["Methodology", "Analysis", "Persistence"], domain),
-            makePath("University Professor", "Teach higher education and lead independent research projects.", 85, ["Teaching", "Research", "Communication"], domain),
-            makePath("Data Research Analyst", "Process scientific or industrial data to identify valuable trends.", 80, ["Statistics", "Analysis", "Software"], domain),
-        ],
-        "Entrepreneurship": [
-            makePath("Startup Founder", "Build a company from scratch by identifying market gaps and scaling solutions.", 90, ["Vision", "Leadership", "Risk-taking"], domain),
-            makePath("Product Innovator", "Develop new product concepts and oversee their market validation.", 85, ["Design", "Strategy", "User Research"], domain),
-            makePath("Venture Builder", "Systematically launch and grow multiple new business ventures.", 80, ["Scale", "Funding", "Operations"], domain),
-        ],
-        "Law & Judiciary": [
-            makePath("Corporate Lawyer", "Advise businesses on legal rights, duties, and professional responsibilities.", 90, ["Law", "Negotiation", "Logic"], domain),
-            makePath("Civil Judge", "Preside over legal proceedings and ensure justice is served according to law.", 85, ["Ethics", "Law", "Critical Thinking"], domain),
-            makePath("Legal Advisor", "Provide expert legal guidance to individuals or non-profit organizations.", 80, ["Law", "Communication", "Drafting"], domain),
-        ],
-        "Design & Media": [
-            makePath("UI/UX Designer", "Design intuitive and aesthetically pleasing digital interfaces for users.", 90, ["Figma", "Interaction Design", "Psychology"], domain),
-            makePath("Graphic Designer", "Communicate ideas through visual content using typography and imagery.", 85, ["Color Theory", "Adobe Suite", "Visual Arts"], domain),
-            makePath("Content Strategist", "Plan and manage multimedia content to achieve marketing and user goals.", 80, ["Writing", "Strategy", "Media Skills"], domain),
-        ],
-        "Skilled Trades": [
-            makePath("Electrician", "Install and repair electrical systems for residential or industrial use.", 90, ["Technical Skills", "Safety", "Manual Dexterity"], domain),
-            makePath("CNC Machinist", "Operate precision computer-controlled machinery to fabricate complex parts.", 85, ["Mathematics", "Precision", "Technical Drawing"], domain),
-            makePath("HVAC Technician", "Maintain heating, ventilation, and air conditioning systems in buildings.", 80, ["Mechanics", "Troubleshooting", "Efficiency"], domain),
-        ]
-    };
-
-    const careers = map[domain] || [
-        makePath("Project Manager", "Plan and execute projects across industries by coordinating teams and resources.", 85, ["Leadership", "Communication", "Planning"], domain),
-        makePath("Business Analyst", "Bridge business needs and technical solutions through analysis and documentation.", 80, ["Analysis", "Communication", "Problem Solving"], domain),
-        makePath("Entrepreneur", "Build and scale your own business venture from ideation to market.", 78, ["Creativity", "Leadership", "Resilience"], domain),
-    ];
-
-    return { recommendations: careers, analysis_summary: `AI generation timed out or failed. Providing curated recommendations for ${domain}.` };
-}
-
 export async function POST(req: NextRequest) {
     try {
         const body: RecommendRequestPayload = await req.json();
@@ -117,7 +33,6 @@ export async function POST(req: NextRequest) {
                     { status: 429, headers: { 'Retry-After': String(Math.ceil(resetInMs / 1000)) } }
                 );
             }
-            console.log(`[/api/recommend] User ${body.user_id} — ${remaining} requests remaining today.`);
         }
 
         // ── Build prompt & call Gemini ───────────────────────────
@@ -131,170 +46,65 @@ export async function POST(req: NextRequest) {
         console.log(`[/api/recommend] Requesting AI (Domain: ${body.domain})`);
         const startTime = Date.now();
 
-        let result: RecommendResponse;
-
         try {
-            // Task: Implement timeout (300s for very slow local LLMs)
-            const timeoutPromise = new Promise<never>((_, reject) =>
-                setTimeout(() => reject(new Error("AI_TIMEOUT")), 300000)
-            );
-
-            const aiPromise = (async () => {
-                const text = await generateGemini(prompt);
-                return JSON.parse(text);
-            })();
-
-            const raw = await Promise.race([aiPromise, timeoutPromise]);
-            console.log("[/api/recommend] Gemini raw:", JSON.stringify(raw));
+            const text = await generateGemini(prompt);
+            const raw = JSON.parse(text);
             const duration = ((Date.now() - startTime) / 1000).toFixed(1);
 
-            console.log(`[/api/recommend] Gemini responded in ${duration}s`);
+            let recommendations: RecommendResponse["recommendations"] = [];
 
-            // Priority 1: Top-level array [{ title, description }]
+            // Helper to normalise a single career path
+            const normalise = (r: any) => ({
+                title: String(r.title || r.name || r.career || "Untitled"),
+                description: String(r.description || r.desc || "No description available."),
+                match_score: typeof r.match_score === "number" ? r.match_score : 85,
+                required_skills: Array.isArray(r.required_skills) ? r.required_skills : [],
+                domain: body.domain as any,
+                avg_salary_usd: typeof r.avg_salary_usd === "number" ? r.avg_salary_usd : 0,
+                job_outlook: (r.job_outlook === "growing" || r.job_outlook === "stable" || r.job_outlook === "declining" || r.job_outlook === "booming") ? r.job_outlook : "growing",
+                time_to_entry_months: typeof r.time_to_entry_months === "number" ? r.time_to_entry_months : 12,
+                learning_resources: Array.isArray(r.learning_resources) ? r.learning_resources : []
+            });
+
             if (Array.isArray(raw)) {
-                result = {
-                    recommendations: raw.map((r: any) =>
-                        makePath(
-                            r.title || r.name || "Untitled",
-                            r.description || r.desc || "No description",
-                            90,
-                            [],
-                            body.domain
-                        )
-                    ),
-                    analysis_summary: `${(raw as any).analysis_summary || "AI-generated recommendations."} (Generated in ${duration}s)`,
-                };
-            }
-            // Priority 2: Nested array format { recommendations: [{ title, description, ... }] }
-            else if (raw.recommendations && Array.isArray(raw.recommendations)) {
-                result = {
-                    recommendations: raw.recommendations.map((r: any) => ({
-                        ...makePath(
-                            r.title || "Untitled",
-                            r.description || "No description",
-                            r.match_score ?? 85,
-                            Array.isArray(r.required_skills) ? r.required_skills : [],
-                            body.domain
-                        ),
-                        avg_salary_usd: typeof r.avg_salary_usd === "number" ? r.avg_salary_usd : 0,
-                        job_outlook: (r.job_outlook === "growing" || r.job_outlook === "stable" || r.job_outlook === "declining") ? r.job_outlook : "growing",
-                        time_to_entry_months: typeof r.time_to_entry_months === "number" ? r.time_to_entry_months : 12,
-                    })),
-                    analysis_summary: `${raw.analysis_summary || "AI-generated recommendations."} (Generated in ${duration}s)`,
-                };
-            }
-            // Priority 3: Flat format { title1, desc1, ... }
-            else if (raw.title1 && raw.desc1) {
-                result = {
-                    recommendations: [
-                        makePath(raw.title1 as string, raw.desc1 as string, 90, [], body.domain),
-                        makePath((raw.title2 ?? "") as string, (raw.desc2 ?? "") as string, 85, [], body.domain),
-                        makePath((raw.title3 ?? "") as string, (raw.desc3 ?? "") as string, 80, [], body.domain),
-                    ].filter(r => r.title),
-                    analysis_summary: `${raw.summary || raw.analysis_summary || "AI-generated recommendations."} (Generated in ${duration}s)`,
-                };
-            }
-            // Priority 4: Heuristic — any array of objects; infer title/description fields
-            else if (typeof raw === "object" && raw !== null) {
-                const keys = Object.keys(raw);
-                let picked: any[] | null = null;
-
-                for (const key of keys) {
-                    const val = (raw as any)[key];
-                    if (
-                        Array.isArray(val) &&
-                        val.some((item: any) => item && typeof item === "object")
-                    ) {
-                        picked = val;
-                        break;
-                    }
-                }
-
+                recommendations = raw.map(normalise);
+            } else if (raw.recommendations && Array.isArray(raw.recommendations)) {
+                recommendations = raw.recommendations.map(normalise);
+            } else if (raw.title1 && raw.desc1) {
+                recommendations = [
+                    normalise({ title: raw.title1, description: raw.desc1 }),
+                    normalise({ title: raw.title2, description: raw.desc2 }),
+                    normalise({ title: raw.title3, description: raw.desc3 })
+                ].filter(r => r.title !== "Untitled");
+            } else {
+                // Heuristic: find any array
+                const picked = Object.values(raw).find(v => Array.isArray(v)) as any[];
                 if (picked) {
-                    result = {
-                        recommendations: picked.map((r: any, index: number) => {
-                            let title =
-                                r.title ||
-                                r.name ||
-                                r.career ||
-                                "";
-
-                            let description =
-                                r.description ||
-                                r.desc ||
-                                "";
-
-                            if (!title) {
-                                for (const k of Object.keys(r)) {
-                                    const v = (r as any)[k];
-                                    const lower = k.toLowerCase();
-                                    if (
-                                        typeof v === "string" &&
-                                        (lower.includes("title") ||
-                                            lower.includes("career") ||
-                                            lower.includes("role"))
-                                    ) {
-                                        title = v;
-                                        break;
-                                    }
-                                }
-                            }
-
-                            if (!description) {
-                                for (const k of Object.keys(r)) {
-                                    const v = (r as any)[k];
-                                    const lower = k.toLowerCase();
-                                    if (
-                                        typeof v === "string" &&
-                                        (lower.includes("description") ||
-                                            lower.includes("summary") ||
-                                            lower.includes("details"))
-                                    ) {
-                                        description = v;
-                                        break;
-                                    }
-                                }
-                            }
-
-                            if (!title) {
-                                title = `Option ${index + 1}`;
-                            }
-                            if (!description) {
-                                description = "AI-generated career option.";
-                            }
-
-                            return makePath(title, description, 90, [], body.domain);
-                        }),
-                        analysis_summary: `${(raw as any).analysis_summary || (raw as any).summary || "AI-generated recommendations."} (Generated in ${duration}s)`,
-                    };
+                    recommendations = picked.map(normalise);
                 } else {
                     throw new Error("UNEXPECTED_JSON_SHAPE");
                 }
-            } else {
-                throw new Error("UNEXPECTED_JSON_SHAPE");
             }
-        } catch (error) {
-            const duration = ((Date.now() - startTime) / 1000).toFixed(1);
-            const errLabel = error instanceof Error ? error.message : "UNKNOWN";
-            console.error(`[/api/recommend] AI FAILED after ${duration}s — reason: ${errLabel}`);
-            console.error("[/api/recommend] Full error:", error);
 
-            result = getFallback(body.domain);
-            // Append the error to the summary so the user can see it in the UI cards
-            result.analysis_summary = `AI Error: ${errLabel} (after ${duration}s). Loading fallbacks for ${body.domain}...`;
+            return NextResponse.json<ApiResponse<RecommendResponse>>({
+                success: true,
+                data: {
+                    recommendations,
+                    analysis_summary: `${raw.analysis_summary || raw.summary || "AI-generated recommendations."} (Generated in ${duration}s)`,
+                },
+            });
+
+        } catch (innerError) {
+            console.error("[/api/recommend] Gemini/Parsing Error:", innerError);
+            throw innerError;
         }
 
-        return NextResponse.json<ApiResponse<RecommendResponse>>({
-            success: true,
-            data: result,
-        });
-
     } catch (error) {
-        console.error("[/api/recommend] Fatal Error:", error);
+        console.error("[/api/recommend] AI Failed:", error);
         return NextResponse.json<ApiResponse>(
             {
                 success: false,
-                error: error instanceof Error ? error.message : "An unexpected error occurred.",
+                error: error instanceof Error ? error.message : "AI career advice engine is currently at capacity.",
             },
             { status: 500 }
         );

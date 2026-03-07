@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { ArrowRight, Sparkles, TrendingUp, Target, BookOpen, Activity } from 'lucide-react';
 
 export default function LandingPage() {
+
   return (
     <div className="min-h-screen bg-[#080808] text-white font-sans">
       {/* Navbar */}
@@ -16,10 +17,10 @@ export default function LandingPage() {
             <span className="text-2xl font-black tracking-tighter">CareerVibe</span>
           </div>
           
-          <div className="flex items-center gap-8">
-            <Link href="/login" className="text-sm font-bold text-gray-400 hover:text-white transition-colors">Sign In</Link>
-            <Link href="/onboarding" className="neon-button text-sm px-6 py-2.5">
-              Start Now
+          <div className="flex items-center gap-6">
+            <Link href="/login" className="text-sm font-bold text-gray-400 hover:text-white transition-colors uppercase tracking-widest">Sign In</Link>
+            <Link href="/signup" className="neon-button text-sm px-6 py-2.5">
+              Sign Up
             </Link>
           </div>
         </div>
@@ -33,7 +34,7 @@ export default function LandingPage() {
             AI-Driven Career Architect
           </div>
           
-          <h1 className="text-6xl md:text-8xl font-black leading-[0.9] tracking-tighter">
+          <h1 className="text-6xl md:text-8xl font-black leading-[0.9] tracking-tighter uppercase">
             HUSTLE SMARTER.<br />
             <span className="text-primary">LEVEL UP</span> FASTER.
           </h1>
@@ -43,7 +44,7 @@ export default function LandingPage() {
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center pt-8">
-            <Link href="/onboarding" className="neon-button text-lg px-10 py-5">
+            <Link href="/signup" className="neon-button text-lg px-10 py-5">
               Build My Roadmap
               <ArrowRight size={22} />
             </Link>
@@ -75,7 +76,7 @@ export default function LandingPage() {
               <div className="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-primary">
                 <f.icon size={28} />
               </div>
-              <h3 className="text-2xl font-black">{f.title}</h3>
+              <h3 className="text-2xl font-black uppercase tracking-tight">{f.title}</h3>
               <p className="text-gray-500 leading-relaxed font-medium">{f.desc}</p>
             </div>
           ))}
