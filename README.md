@@ -2,6 +2,8 @@
 
 > **AI-Driven Career Architect** — Personalized career roadmaps powered by Google Gemini AI. Map your shift, master new skills, and land your dream role with precision.
 
+**[🌐 Live Demo](https://careervibe-ten.vercel.app/)**
+
 ![CareerVibe](https://img.shields.io/badge/CareerVibe-AI%20Career%20Advisor-brightgreen?style=for-the-badge)
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?style=for-the-badge&logo=next.js)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue?style=for-the-badge&logo=typescript)
@@ -149,6 +151,8 @@ This project uses the **Google Gemini Free Tier**. To avoid exhausting your quot
 2. Import the project in [Vercel](https://vercel.com)
 3. Add your environment variables in the Vercel dashboard (Settings → Environment Variables)
 4. Deploy!
+
+You can view the live deployment at: [https://careervibe-ten.vercel.app/](https://careervibe-ten.vercel.app/)
 
 > 🔐 **Important:** Add your `GEMINI_API_KEY` and Supabase credentials as environment variables in your deployment platform. Do **not** commit them to the repo.
 
